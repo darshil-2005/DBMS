@@ -10,8 +10,8 @@ bool StorageManager::Bootstrap() {
     std::cout<<"[INIT] Initialized data directory: "<<DATA_DIR<<std::endl;
   };
 
-  fd_database = open(DB_PATH, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  fd_logs = open(LOG_PATH, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+  fd_database = open(DB_PATH, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+  fd_logs = open(LOG_PATH, O_WRONLY | O_CREAT | O_APPEND | O_DIRECT, S_IRUSR | S_IWUSR);
 
   if (fd_database == -1 || fd_logs == -1) {
     if (fd_database != -1) { close(fd_database); fd_database = -1; }
@@ -46,11 +46,11 @@ Result<bool> StorageManager::PageWrite(PageID pid, const Byte* buffer) {
     
     if (byte_count == -1) {
         return { .value = false, .err = DiskWriteErr::SystemError };
-    }
+    };
 
     if (static_cast<size_t>(byte_count) != PAGE_SIZE) {
         return { .value = false, .err = DiskWriteErr::DiskFullOrTruncated };
-    }
+    };
 
     return { .value = true, .err = DiskWriteErr::None };    
 };

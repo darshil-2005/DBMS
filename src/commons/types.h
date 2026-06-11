@@ -32,6 +32,7 @@ enum ErrType {
   
   BufferPoolFull,
   AllPagesPinned,
+  PageNotFoundInBufferPool,
 };
 
 enum class PageType : uint8_t {
