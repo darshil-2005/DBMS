@@ -34,6 +34,11 @@
 #include <../../include/page/page.h>
 #include "../page/internal_page.h"
 
+struct WriteStatus {
+  uint16_t written;
+  Byte* overflow_info_store_address;
+};
+
 class BTree {
   
   PageID root_page_id;

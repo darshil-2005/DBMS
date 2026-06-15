@@ -19,9 +19,41 @@ bool BTree::InsertTuple(const Byte *buffer, BufferSize buffer_size, Key key) {
     root_page_id = new_root_id;
   };
 
-  size_t written = BTree::WriteChunk
+  // WriteStatus returns the pointer to the byte that starts at overflow flag of 1 byte and followed by 2 bytes of overflow_page_id
+  WriteStatus write_status = BTree::WriteChunkLeaf(to_write_page.ptr, buffer, buffer_size, key);
+  
+  if (write_status.written == buffer_size) {
+    buffer_pool->ReleasePage(to_write_page.pid, true);
+    return true;
+  };
 
+  buffer = buffer + write_status.written;
+  buffer_size = buffer_size - write_status.written;
 
+  while (buffer_size > 0) {
+    Result<NewPage> new_page_response = buffer_pool->AllocateNewPage();
+    // handle error
+    NewPage new_page = new_page_response.value;
+    OverflowPageHeader* page_header = reinterpret_cast<OverflowPageHeader*>(new_page.ptr);
+    page_header->page_type = PageType::OverflowPage;
+    page_header->page_id = new_page.pid;
+    OverflowInfo* overflow_info = reinterpret_cast<OverflowInfo*>(write_status.overflow_info_store_address);
+    overflow_info->overflow = 1;
+    overflow_info->overflow_page = new_page.pid;
+
+    buffer_pool->ReleasePage(new_page.pid, true);
+
+    write_status = BTree::WriteChunkOverflow(new_page.ptr, buffer, buffer_size);
+
+    buffer = buffer + write_status.written;
+    buffer_size = buffer_size - write_status.written;
+
+    if (buffer_size == 0) {
+      buffer_pool->ReleasePage(new_page.pid, true);
+    };
+  };
+
+  return true;
 };
 
 SplitReport BTree::FindPageToWrite(PageID pid, Key key, BufferSize buffer_size, NewPage *to_write_page) {
@@ -35,9 +67,9 @@ SplitReport BTree::FindPageToWrite(PageID pid, Key key, BufferSize buffer_size, 
   if (current_page_header->page_type == PageType::LeafPage) {
 
     uint16_t available_space = LeafPage::CheckAvailableSpace(page);
-    uint16_t min_entry = TUPLE_HEADER_SIZE + min(128, buffer_size);
+    uint16_t min_entry = SLOT_SIZE + TUPLE_HEADER_SIZE + min(MIN_LEAF_PAGE_DATA, buffer_size);
 
-    if (min_entry + SLOT_SIZE <= available_space) {
+    if (min_entry <= available_space) {
       *to_write_page = {.ptr = page, .pid = current_page_header->page_id};
       return {
           .was_split = 0,
@@ -116,15 +148,57 @@ SplitReport BTree::FindPageToWrite(PageID pid, Key key, BufferSize buffer_size, 
   };
 };
 
-size_t BTree::WriteChunkLeaf(Byte* page, const Byte *buffer, BufferSize buffer_size, Key key) {
-  
+WriteStatus BTree::WriteChunkLeaf(Byte* page, const Byte *buffer, BufferSize buffer_size, Key key) {
+    
+  // We know the minimum space is available because otherwise node would have split.
+  uint16_t data_size = SLOT_SIZE + TUPLE_HEADER_SIZE + min(buffer_size, MAX_LEAF_PAGE_DATA);
+  uint16_t available_space = LeafPage::CheckAvailableSpace(page);
+  LeafPageHeader* page_header = reinterpret_cast<LeafPageHeader*>(page);
+
+  if (data_size <= available_space) {
+
+    uint16_t payload_size = TUPLE_HEADER_SIZE + min(buffer_size, MAX_LEAF_PAGE_DATA);
+
+    SlotArrayElement* slot_array_start = page + LEAF_PAGE_HEADER_SIZE;
+    SlotArrayElement* slot_array_end = page + (SLOT_SIZE * page_header->slot_array_size);
+
+    SlotArrayElement* it = upper_bound(slot_array_start, slot_array_end, page, key);
+    if (it != slot_array_end) memmove(it+SLOT_SIZE, it, (slot_array_end - it) * SLOT_SIZE);
+
+    it->offset = free_space_end_offset - payload_size + 1;
+    it->length = payload_size;
+
+    memcpy(page + it->offset, buffer, payload_size); 
+    return { .written = payload_size, .overflow_info_store_address = nullptr };
+
+  } else {
+
+    uint16_t payload_size = available_space - SLOT_SIZE;
+
+    SlotArrayElement* slot_array_start = page + LEAF_PAGE_HEADER_SIZE;
+    SlotArrayElement* slot_array_end = page + (SLOT_SIZE * page_header->slot_array_size);
+
+    SlotArrayElement* it = upper_bound(slot_array_start, slot_array_end, page, key);
+    if (it != slot_array_end) memmove(it+SLOT_SIZE, it, (slot_array_end - it) * SLOT_SIZE);
+
+    it->offset = free_space_end_offset - payload_size + 1;
+    it->length = payload_size;
+
+    memcpy(page + it->offset, buffer, payload_size); 
+    return { .written = payload_size, .overflow_info_store_address = page + it->offset };
+  };
 };
 
-size_t BTree::WriteChunkOverflow(Byte* page, const Byte *buffer, BufferSize buffer_size, Key key) {
+WriteStatus BTree::WriteChunkOverflow(Byte* page, const Byte *buffer, BufferSize buffer_size) {
+
+  if (buffer_size + OVERFLOW_PAGE_HEADER_SIZE > PAGE_SIZE) {
+    uint16_t written_size = PAGE_SIZE - OVERFLOW_PAGE_HEADER_SIZE;
+    memcpy(page + OVERFLOW_PAGE_HEADER_SIZE, buffer, written_size);
+    return { .written = written_size, .overflow_info_store_address = page + OVERFLOW_PAGE_OVERFLOW_INFO_OFFSET } 
+
+  } else {
+    memcpy(page, buffer, buffer_size);
+    return { .written = buffer_size, .overflow_info_store_address = nullptr };
+  };
 };
 
-NewPage BTree::RequestPage() {
-  Record<NewPage> result = buffer_pool->AllocateNewPage();
-  if (result.err != ErrType::None) // handle errors
-    return result.value;
-};
