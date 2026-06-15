@@ -3,16 +3,24 @@
 
 using fs = std::filesystem;
 
-bool StorageManager::Bootstrap() {
 
-  new_page_offset = 0;
+// Page ID: 0 will now be meta data pages.
+
+bool StorageManager::Bootstrap() {
 
   if (!fs.exists(DATA_DIR)) {
     fs.create_directories(DATA_DIR);
     std::cout << "[INIT] Initialized data directory: " << DATA_DIR << std::endl;
   };
 
-  fd_database = open(DB_PATH, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+  if (fs::exists(DB_PATH)) {
+    fd_database = open(DB_PATH, O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
+  } else {
+    fd_database = open(DB_PATH, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+    uint16_t off_start = 2;
+    pwrite(fd_database, &off_start, sizeof(off_start), 0);
+  };
+
   fd_logs = open(LOG_PATH, O_WRONLY | O_CREAT | O_APPEND | O_DIRECT,
                  S_IRUSR | S_IWUSR);
 
@@ -26,8 +34,15 @@ bool StorageManager::Bootstrap() {
       fd_logs = -1;
     }
     return false;
-  }
+  };
 
+  Byte buffer[PAGE_SIZE];
+  Result<bool> read_result = ReadPage(0, buffer);
+  if (read_result.arr != ErrType::None) {
+    // handle error
+  };
+  
+  new_page_offset_index = reinterpret_cast<uint16_t*>(buffer);
   return true;
 };
 
@@ -99,6 +114,8 @@ Result<PageID> AllocateNewPage() {
   };
 
   new_page_offset_index++;
+  fd_database = open(DB_PATH, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+  pwrite(fd_database, &new_page_offset_index, sizeof(off_start), 0);
   return { .value = new_page_offset_index - 1, .err = ErrType::None };  
 };
 

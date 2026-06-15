@@ -34,7 +34,7 @@ struct __attribute__((__packed__)) SplitReport {
 struct __attribute__((__packed__)) NewPage {
   Byte* ptr;
   PageID pid;
-}
+};
 
 enum ErrType {
 
@@ -57,8 +57,7 @@ enum class PageType : uint8_t {
     Meta = 1,
     InternalPage = 2,
     LeafPage = 3,
-    FreeSpaceMap = 4,
-    OverflowPage = 5,
+    OverflowPage = 4,
 };
 
 template <typename T>

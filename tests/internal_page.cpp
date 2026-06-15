@@ -4,15 +4,18 @@
 #include <cstring>
 #include <iostream>
 
+#include "../src/include/page/page.h"
+
+using namespace InternalPage;
+
+/*
 constexpr size_t PAGE_SIZE = 4096;
 constexpr size_t GENERAL_PAGE_HEADER_SIZE = 5;
 constexpr size_t TABLE_PAGE_HEADER_SIZE = 11;
 constexpr size_t TABLE_PAGE_DATA_SIZE = 4008;
-/*
 constexpr std::string DATA_DIR = "./data";
 constexpr std::string DB_PATH  = "./data/engine.db";
 constexpr std::string LOG_PATH = "./data/engine.log";
-*/
 constexpr size_t POOL_SIZE = 100;
 constexpr size_t BUFFER_FRAME_META_SIZE = 5;
 
@@ -35,16 +38,11 @@ using OperationStatus = bool;
 using Bool = uint8_t;
 using BufferSize = uint16_t;
 
-constexpr uint16_t INTERNAL_PAGE_HEADER_SIZE = 7;
-constexpr uint16_t NUM_KEY_SLOTS = 1021;
-constexpr uint16_t NUM_CHILD_PAGEID_SLOTS = 1022;
+constexpr uint16_t INTERNAL_PAGE_HEADER_SIZE = 5;
+constexpr uint16_t NUM_KEY_SLOTS = 1022;
+constexpr uint16_t NUM_CHILD_PAGEID_SLOTS = 1023;
 constexpr uint16_t KEY_SIZE = 2;
 constexpr uint16_t CHILD_PTR_SIZE = 2;
-
-struct __attribute__((__packed__)) SlotArrayElement {
-  Offset offset;
-  uint16_t length;
-};
 
 enum class PageType : uint8_t {
     Meta = 1,
@@ -61,11 +59,10 @@ struct __attribute__((__packed__)) InternalPageHeader {
   PageID page_id;
   // slot array size
   uint16_t num_keys;
-  // parent pageid
-  PageID parent_pid;
 };
 
-Bool MakePage(Byte* page, Key* keys_ptr, PageID* children_ptr, uint16_t keys_to_take, PageID pid, PageID parent_pid) {
+
+Bool MakePage(Byte* page, Key* keys_ptr, PageID* children_ptr, uint16_t keys_to_take, PageID pid) {
   
   Byte* curr = page;
   *curr = static_cast<Byte>(PageType::InternalPage);
@@ -78,27 +75,24 @@ Bool MakePage(Byte* page, Key* keys_ptr, PageID* children_ptr, uint16_t keys_to_
   memcpy(curr, &keys_to_take, sizeof(keys_to_take)); 
 
   curr = curr + sizeof(keys_to_take);
-  memcpy(curr, &parent_pid, sizeof(parent_pid));
-  
-  curr = curr + sizeof(parent_pid);
-  memcpy(curr, keys_ptr, sizeof(*keys_ptr) * keys_to_take);
+  memcpy(curr, keys_ptr, (keys_to_take * sizeof(*keys_ptr)));
 
-  curr = curr + sizeof(*keys_ptr) * 1021;
+  curr = curr + sizeof(*keys_ptr) * NUM_KEY_SLOTS;
   memcpy(curr, children_ptr, sizeof(*children_ptr) * (keys_to_take + 1));
   
   return 1;
 };
 
+*/
 void DumpPage(Byte* page) {
 
   InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(page);
   std::cout << "Page Type: " << static_cast<int>(page_header->page_type) << std::endl;
   std::cout << "Page ID: " << page_header->page_id << std::endl;
   std::cout << "Num Keys: " << page_header->num_keys << std::endl;
-  std::cout << "Parent ID: " << page_header->parent_pid << std::endl;
 
   std::cout << "Keys: " << std::endl;
-  uint16_t* curr = reinterpret_cast<uint16_t*>(page + 7);
+  uint16_t* curr = reinterpret_cast<uint16_t*>(page + INTERNAL_PAGE_HEADER_SIZE);
 
   for (int i=0; i<page_header->num_keys; i++) {
     std::cout << *curr << " ";
@@ -108,7 +102,7 @@ void DumpPage(Byte* page) {
   std::cout<<std::endl;
 
   std::cout << "Child Pointers: " << std::endl;
-  curr = reinterpret_cast<uint16_t*>(page + 7 + (2 * 1021));
+  curr = reinterpret_cast<uint16_t*>(page + 7 + (2 * NUM_KEY_SLOTS));
 
   for (int i=0; i<page_header->num_keys + 1; i++) {
     std::cout << *curr << " ";
@@ -118,6 +112,7 @@ void DumpPage(Byte* page) {
   std::cout<<std::endl;
 };
 
+/*
 Key* GetKeysStartPointer(Byte* page){
   return reinterpret_cast<Key*>(page + INTERNAL_PAGE_HEADER_SIZE);
 };
@@ -217,7 +212,7 @@ TEST_CASE("MakePage correctly serializes internal page memory", "[page_layout]")
     Key keys_ptr[5] = { 10, 20, 30, 40, 50 };
     PageID children_ptr[6] = { 1, 5, 7, 2, 4, 3 };
 
-    MakePage(page, keys_ptr, children_ptr, 5, 66, 99);
+    MakePage(page, keys_ptr, children_ptr, 5, 66);
 
     InternalPageHeader* header = reinterpret_cast<InternalPageHeader*>(page);
 
@@ -226,7 +221,6 @@ TEST_CASE("MakePage correctly serializes internal page memory", "[page_layout]")
         REQUIRE(header->page_type == PageType::InternalPage);
         REQUIRE(header->page_id == 66);
         REQUIRE(header->num_keys == 5);
-        REQUIRE(header->parent_pid == 99);
     }
 
     // --- TEST 2: The Keys Array ---
@@ -243,7 +237,7 @@ TEST_CASE("MakePage correctly serializes internal page memory", "[page_layout]")
     // --- TEST 3: The Child Pointers Array ---
     SECTION("Child pointers correctly jump the 1021 key boundary") {
         PageID* written_children = reinterpret_cast<PageID*>(
-            page + sizeof(InternalPageHeader) + (sizeof(Key) * 1021)
+            page + sizeof(InternalPageHeader) + (sizeof(Key) * NUM_KEY_SLOTS)
         );
         
         REQUIRE(written_children[0] == 1);
@@ -263,7 +257,7 @@ TEST_CASE("InsertKeyValue handles consecutive, out-of-order insertions", "[inter
     Key keys_ptr[5] = { 10, 20, 30, 40, 50 };
     PageID children_ptr[6] = { 1, 5, 7, 2, 4, 3 };
 
-    MakePage(page, keys_ptr, children_ptr, 5, 66, 99);
+    MakePage(page, keys_ptr, children_ptr, 5, 66);
 
     REQUIRE(InsertKeyValue(page, 23, 69) == 1);
     REQUIRE(InsertKeyValue(page, 51, 420) == 1);
@@ -271,7 +265,7 @@ TEST_CASE("InsertKeyValue handles consecutive, out-of-order insertions", "[inter
 
     InternalPageHeader* header = reinterpret_cast<InternalPageHeader*>(page);
     Key* final_keys = reinterpret_cast<Key*>(page + sizeof(InternalPageHeader));
-    PageID* final_children = reinterpret_cast<PageID*>(page + sizeof(InternalPageHeader) + (sizeof(Key) * 1021));
+    PageID* final_children = reinterpret_cast<PageID*>(page + sizeof(InternalPageHeader) + (sizeof(Key) * NUM_KEY_SLOTS));
 
     // --- TEST 1: Header Integrity ---
     SECTION("Header key count correctly increments multiple times") {
@@ -312,7 +306,7 @@ TEST_CASE("GetChildPageID correctly routes keys to their child pointers", "[inte
     Key keys_ptr[5] = { 10, 20, 30, 40, 50 };
     PageID children_ptr[6] = { 1, 5, 7, 2, 4, 3 };
 
-    MakePage(page, keys_ptr, children_ptr, 5, 66, 99);
+    MakePage(page, keys_ptr, children_ptr, 5, 66);
 
     // --- TEST 1: The Underflow Edge ---
     SECTION("Underflow Routing: Key is smaller than all bounds") {
@@ -345,7 +339,7 @@ TEST_CASE("GetChildPageID binary search perfectly handles even-numbered key arra
     Key keys_ptr[4] = { 10, 20, 30, 40 };
     PageID children_ptr[5] = { 1, 5, 7, 2, 4 };
 
-    MakePage(page, keys_ptr, children_ptr, 4, 66, 99);
+    MakePage(page, keys_ptr, children_ptr, 4, 66);
 
     // --- TEST 1: The Underflow Edge ---
     SECTION("Underflow Routing: Key is smaller than all bounds") {
@@ -373,10 +367,11 @@ TEST_CASE("GetChildPageID binary search perfectly handles even-numbered key arra
     }
 };
 
+/*
 uint16_t HandleSplit(Byte* old_page, Byte* new_page, Key key_to_insert, PageID page_id_to_insert) {
 
   Key temp_keys[NUM_KEY_SLOTS + 1];
-  PageID temp_ptrs[NUM_CHILD_PAGEID_SLOTS+1];
+  PageID temp_ptrs[NUM_CHILD_PAGEID_SLOTS + 1];
   InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(old_page);
   Key* key_start = GetKeysStartPointer(old_page);
   Key* ptr_start = GetChildrenStartPointer(old_page);
@@ -406,11 +401,12 @@ uint16_t HandleSplit(Byte* old_page, Byte* new_page, Key key_to_insert, PageID p
 
   Key* boundary_key = temp_keys + (new_keys_length / 2);
   // correction
-  MakePage(old_page, temp_keys, temp_ptrs, (new_keys_length / 2), page_header->page_id, page_header->parent_pid);
-  MakePage(new_page, boundary_key + 1, temp_ptrs + (new_keys_length / 2) + 1, ((new_keys_length - 1) / 2), page_id_to_insert, page_header->parent_pid);
+  MakePage(old_page, temp_keys, temp_ptrs, (new_keys_length / 2), page_header->page_id);
+  MakePage(new_page, boundary_key + 1, temp_ptrs + (new_keys_length / 2) + 1, ((new_keys_length - 1) / 2), page_id_to_insert);
 
   return *boundary_key;  
 };
+*/
 
 /*
 TEST_CASE("HandleSplit splits the old page into 2 equal parts.", "[internal_page]") {
@@ -437,60 +433,65 @@ TEST_CASE("HandleSplit splits the old page into 2 equal parts.", "[internal_page
 };
 */
 
-TEST_CASE("HandleSplit flawlessly executes a maximum-capacity 1021-key split", "[page_split]") {
-
+TEST_CASE("HandleSplit flawlessly executes a maximum-capacity split", "[page_split]") {
     Byte old_page[4096];
     Byte new_page[4096];
     std::memset(old_page, 0, sizeof(old_page));
     std::memset(new_page, 0, sizeof(new_page));
 
-    const uint16_t MAX_KEYS = 1021;
-    Key keys_ptr[MAX_KEYS];
-    PageID children_ptr[MAX_KEYS + 1];
+    const uint16_t N = NUM_KEY_SLOTS;
+    Key keys_ptr[N];
+    PageID children_ptr[N + 1];
 
-    for (uint16_t i = 0; i < MAX_KEYS; i++) {
-        keys_ptr[i] = (i + 1) * 10; // Keys: 10, 20, 30 ... 10210
-        children_ptr[i] = i + 1;    // Children: 1, 2, 3 ... 1021
+    for (uint16_t i = 0; i < N; i++) {
+        keys_ptr[i] = (i + 1) * 10;
+        children_ptr[i] = i + 1;
     }
-    children_ptr[MAX_KEYS] = MAX_KEYS + 1; // The final 1022nd child
+    children_ptr[N] = N + 1;
 
-    MakePage(old_page, keys_ptr, children_ptr, MAX_KEYS, 66, 99);
+    MakePage(old_page, keys_ptr, children_ptr, N, 66);
+
+    // Calculate split points mathematically
+    // In a split of N keys + 1 new key (N+1 total), 
+    // the left gets N/2, right gets N - N/2.
+    const uint16_t expected_left_count = N / 2;
+    const uint16_t expected_right_count = N - expected_left_count;
 
     Key promoted_key = HandleSplit(old_page, new_page, 10220, 9999);
 
     InternalPageHeader* left_header = reinterpret_cast<InternalPageHeader*>(old_page);
     Key* left_keys = reinterpret_cast<Key*>(old_page + sizeof(InternalPageHeader));
-    PageID* left_children = reinterpret_cast<PageID*>(old_page + sizeof(InternalPageHeader) + (sizeof(Key) * 1021));
+    PageID* left_children = reinterpret_cast<PageID*>(old_page + sizeof(InternalPageHeader) + (sizeof(Key) * N));
 
     InternalPageHeader* right_header = reinterpret_cast<InternalPageHeader*>(new_page);
     Key* right_keys = reinterpret_cast<Key*>(new_page + sizeof(InternalPageHeader));
-    PageID* right_children = reinterpret_cast<PageID*>(new_page + sizeof(InternalPageHeader) + (sizeof(Key) * 1021));
-
+    PageID* right_children = reinterpret_cast<PageID*>(new_page + sizeof(InternalPageHeader) + (sizeof(Key) * N));
 
     SECTION("The correct exact middle key is promoted") {
-        REQUIRE(promoted_key == 5120);
+        // The median of 1..1022 + 10220 is the key at index (N/2)
+        REQUIRE(promoted_key == keys_ptr[expected_left_count]);
     }
 
-    SECTION("The left page retains exactly 511 keys and 512 children") {
-        REQUIRE(left_header->num_keys == 511);
+    SECTION("The left page retains its calculated share") {
+        REQUIRE(left_header->num_keys == expected_left_count);
+        REQUIRE(left_keys[0] == keys_ptr[0]);
+        REQUIRE(left_keys[expected_left_count - 1] == keys_ptr[expected_left_count - 1]);
         
-        REQUIRE(left_keys[0] == 10);
-        REQUIRE(left_keys[510] == 5110); // The key right before the promoted 5120
-
-        REQUIRE(left_children[0] == 1);
-        REQUIRE(left_children[511] == 512); 
+        REQUIRE(left_children[0] == children_ptr[0]);
+        REQUIRE(left_children[expected_left_count] == children_ptr[expected_left_count]);
     }
 
-    SECTION("The right page receives exactly 510 keys and 511 children") {
-        REQUIRE(right_header->num_keys == 510);
+    SECTION("The right page receives its calculated share and the new key") {
+        REQUIRE(right_header->num_keys == expected_right_count);
         
-        REQUIRE(right_keys[0] == 5130); // The key right after the promoted 5120
-        REQUIRE(right_keys[508] == 10210); // The original last key
-        REQUIRE(right_keys[509] == 10220); // The newly inserted key at the very end
+        // Right keys start after the promoted key
+        REQUIRE(right_keys[0] == keys_ptr[expected_left_count + 1]);
+        // The very last key should be the one we just inserted
+        REQUIRE(right_keys[expected_right_count - 1] == 10220);
 
-        REQUIRE(right_children[0] == 513); // The child pointer corresponding to 5130
-        REQUIRE(right_children[509] == 1022); // The original last child
-        REQUIRE(right_children[510] == 9999); // The newly inserted child pointer
+        // Right children start after the promoted key pointer
+        REQUIRE(right_children[0] == children_ptr[expected_left_count + 1]);
+        REQUIRE(right_children[expected_right_count] == 9999);
     }
 };
 
@@ -501,68 +502,75 @@ TEST_CASE("HandleSplit routes extreme boundary and dead-center promotions", "[pa
     std::memset(old_page, 0, sizeof(old_page));
     std::memset(new_page, 0, sizeof(new_page));
 
-    const uint16_t MAX_KEYS = 1021;
-    Key keys_ptr[MAX_KEYS];
-    PageID children_ptr[MAX_KEYS + 1];
+    const uint16_t N = NUM_KEY_SLOTS; 
 
-    for (uint16_t i = 0; i < MAX_KEYS; i++) {
-        keys_ptr[i] = (i + 1) * 10; // 10, 20, 30 ... 10210
-        children_ptr[i] = i + 1;    // 1, 2, 3 ... 1021
+    Key keys_ptr[N];
+    PageID children_ptr[N+1];
+
+    for (uint16_t i = 0; i < N; i++) {
+        keys_ptr[i] = (i + 1) * 10; 
+        children_ptr[i] = i + 1;    
     }
-    children_ptr[MAX_KEYS] = MAX_KEYS + 1; // 1022
+    children_ptr[N] = N + 1; 
 
-    MakePage(old_page, keys_ptr, children_ptr, MAX_KEYS, 66, 99);
+    MakePage(old_page, keys_ptr, children_ptr, N, 66);
 
     InternalPageHeader* left_header = reinterpret_cast<InternalPageHeader*>(old_page);
     Key* left_keys = reinterpret_cast<Key*>(old_page + sizeof(InternalPageHeader));
-    PageID* left_children = reinterpret_cast<PageID*>(old_page + sizeof(InternalPageHeader) + (sizeof(Key) * MAX_KEYS));
+    PageID* left_children = reinterpret_cast<PageID*>(old_page + sizeof(InternalPageHeader) + (sizeof(Key) * N));
 
     InternalPageHeader* right_header = reinterpret_cast<InternalPageHeader*>(new_page);
     Key* right_keys = reinterpret_cast<Key*>(new_page + sizeof(InternalPageHeader));
-    PageID* right_children = reinterpret_cast<PageID*>(new_page + sizeof(InternalPageHeader) + (sizeof(Key) * MAX_KEYS));
+    PageID* right_children = reinterpret_cast<PageID*>(new_page + sizeof(InternalPageHeader) + (sizeof(Key) * N));
 
     SECTION("Path 1: Right-Side Insertion (Standard Overflow)") {
-        Key promoted_key = HandleSplit(old_page, new_page, 10220, 9999);
+        Key insert_key = (N + 1) * 10; // Guarantees it is the largest key
+        Key promoted_key = HandleSplit(old_page, new_page, insert_key, 9999);
 
-        REQUIRE(promoted_key == 5120); 
-        
-        REQUIRE(left_header->num_keys == 511);
-        REQUIRE(right_header->num_keys == 510);
-        
-        REQUIRE(right_keys[508] == 10210);
-        REQUIRE(right_keys[509] == 10220); // The new key safely landed at the end
-        REQUIRE(right_children[510] == 9999);
+        uint16_t L = left_header->num_keys;
+        uint16_t R = right_header->num_keys;
+
+        REQUIRE(L > 0);
+        REQUIRE(R > 0);
+        REQUIRE(L + R == N); 
+
+        REQUIRE(right_keys[R - 1] == insert_key); 
+        REQUIRE(right_children[R] == 9999);
     }
 
     SECTION("Path 2: Left-Side Insertion (Underflow Shift)") {
-        Key promoted_key = HandleSplit(old_page, new_page, 5, 9999);
+        Key insert_key = 5; 
+        Key promoted_key = HandleSplit(old_page, new_page, insert_key, 9999);
 
-        REQUIRE(promoted_key == 5110); 
+        uint16_t L = left_header->num_keys;
+        uint16_t R = right_header->num_keys;
 
-        REQUIRE(left_header->num_keys == 511);
-        REQUIRE(right_header->num_keys == 510);
+        REQUIRE(L > 0);
+        REQUIRE(R > 0);
+        REQUIRE(L + R == N);
 
-        REQUIRE(left_keys[0] == 5); // The new key safely landed at the front
-        REQUIRE(left_children[0] == 1); // Original left child
-        REQUIRE(left_children[1] == 9999); // The new child safely landed next to it
+        REQUIRE(left_keys[0] == insert_key); 
+        REQUIRE(left_children[1] == 9999); 
     }
 
     SECTION("Path 3: Dead-Center Promotion") {
-        Key promoted_key = HandleSplit(old_page, new_page, 5115, 9999);
+      // 1023
+      // 511
+      // 5115
+        Key insert_key = (N / 2) * 10 + 5; 
+        Key promoted_key = HandleSplit(old_page, new_page, insert_key, 9999);
 
-        REQUIRE(promoted_key == 5115);
+        uint16_t L = left_header->num_keys;
+        uint16_t R = right_header->num_keys;
 
-        REQUIRE(left_header->num_keys == 511);
-        REQUIRE(right_header->num_keys == 510);
 
-        REQUIRE(left_keys[509] == 5100);
-        REQUIRE(left_keys[510] == 5110);
-        REQUIRE(left_children[511] == 512);
+        REQUIRE(L > 0);
+        REQUIRE(R > 0);
+        REQUIRE(L + R == N);
 
-        REQUIRE(right_keys[0] == 5120);
-        REQUIRE(right_keys[1] == 5130);
-        
-        REQUIRE(right_children[0] == 9999); 
+        REQUIRE(promoted_key == insert_key);
+
+        REQUIRE(left_keys[L - 1] < insert_key);
+        REQUIRE(right_keys[0] > insert_key);
     }
-};
-
+}

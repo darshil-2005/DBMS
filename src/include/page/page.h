@@ -1,7 +1,7 @@
-#include <../../commons/types.h>
-#include <../../commons/constants.h>
-#include <../../commons/uitls.h>
+#include "../../commons/types.h"
+#include "../../commons/constants.h"
 #include <cstring>
+#include <algorithm>
 
 // We will need serializer for storing struct into file because if we store directly 
 // the padding will be addded too and Page wont remain the size it is supposed to be.
@@ -40,8 +40,27 @@ struct PageHeader {
   PageID page_id;
 };
 
-constexpr LEAF_PAGE_HEADER_SIZE = 13;
-constexpr SLOT_SIZE = 4;
+constexpr uint16_t LEAF_PAGE_HEADER_SIZE = 14;
+constexpr uint16_t SLOT_SIZE = 9;
+constexpr size_t LEAF_TUPLE_DATA_SIZE_MAX = 1280;
+constexpr uint16_t OVERFLOW_PAGE_HEADER_SIZE = 10;
+constexpr size_t OVERFLOW_TUPLE_DATA_SIZE_MAX = 1280;
+
+struct __attribute__((__packed__)) SlotArrayElement {
+  Offset offset;
+  uint16_t length;
+  Bool overflow;
+  RecordID next_record;
+};
+
+struct OverflowPageHeader {
+  PageType page_type;
+  PageID page_id;
+  Offset free_space_end_offset;
+  uint16_t slot_array_size;
+  Bool overflow;
+  PageID next_page_id;
+};
 
 struct LeafPageHeader {
   // page type
@@ -57,13 +76,14 @@ struct LeafPageHeader {
   PageID prev_pid;
   // sibling next pageid
   PageID next_pid;
-  // parent pageid
-  PageID parent_pid;
+  // overflow
+  Bool overflow;
+  PageID next_page_id;
 };
 
-constexpr uint16_t INTERNAL_PAGE_HEADER_SIZE = 7;
-constexpr uint16_t NUM_KEY_SLOTS = 1021;
-constexpr uint16_t NUM_CHILD_PAGEID_SLOTS = 1022;
+constexpr uint16_t INTERNAL_PAGE_HEADER_SIZE = 5;
+constexpr uint16_t NUM_KEY_SLOTS = 1022;
+constexpr uint16_t NUM_CHILD_PAGEID_SLOTS = 1023;
 constexpr uint16_t KEY_SIZE = 2;
 constexpr uint16_t CHILD_PTR_SIZE = 2;
 
@@ -74,15 +94,6 @@ struct InternalPageHeader {
   PageID page_id;
   // slot array size
   uint16_t num_keys;
-  // parent pageid
-  PageID parent_pid;
-};
-
-struct __attribute__((__packed__)) SlotArrayElement {
-  Offset offset;
-  uint16_t length;
-  // Not clear if we really need this right now since we run compact after every delete
-  // Byte is_deleted;
 };
 
 class LeafPage {
@@ -93,7 +104,7 @@ class LeafPage {
   uint16_t CheckAvailableSpace(Byte* page);
 };
 
-class InternalPage {
+namespace InternalPage {
   // takes the pointer to first byte of the page and the key and return page_id of the page associated with that key in the internal page.
   PageID GetChildPageID(Byte* page, uint16_t index);
 
@@ -104,7 +115,5 @@ class InternalPage {
   // Splits the keys in 
   uint16_t HandleSplit(Byte* old_page, Byte* new_page, Key key_to_insert, PageID page_id_to_insert);
   Bool InsertKeyValue(Byte* page, Key boundary_key, PageID new_pid);
-  Bool MakePage(Byte* page, Key* keys_ptr, PageID* children_ptr, uint16_t keys_to_take, PageID pid, PageID parent_pid);
+  Bool MakePage(Byte* page, Key* keys_ptr, PageID* children_ptr, uint16_t keys_to_take, PageID pid); 
 };
-
-

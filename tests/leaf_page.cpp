@@ -1,4 +1,4 @@
-#include "catch.hpp"
+#include "./utils/catch.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -34,9 +34,17 @@ using OperationStatus = bool;
 using Bool = uint8_t;
 
 using BufferSize = uint16_t;
+
+struct __attribute__((__packed__)) RecordID {
+  PageID pid;
+  OffsetIndex slot_index;
+};
+
 struct __attribute__((__packed__)) SlotArrayElement {
   Offset offset;
   uint16_t length;
+  Bool overflow;
+  RecordID next_record;
 };
 
 enum class PageType : uint8_t {

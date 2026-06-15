@@ -43,6 +43,11 @@ class BTree {
   
 
   BTree(BufferPool& bf);
-  Result<RecordID> InsertTuple(const Byte* buffer, BufferSize buffer_size, const uint16_t index);
+
+  bool InsertTuple(const Byte* buffer, BufferSize buffer_size, Key key);
+  
+  SplitReport FindPageToWrite(Key key, BufferSize buffer_size);
+  size_t WriteChunk(const Byte* buffer, BufferSize buffer_size, const uint16_t index);
+  NewPage RequestNewPage();
 };
 
