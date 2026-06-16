@@ -40,20 +40,21 @@ SlotArrayElement* LeafPage::upper_bound(SlotArrayElement* start, SlotArrayElemen
 Key LeafPage::HandleSplit(Byte* old_page, Byte* new_page, PageID new_pid) {
 
   Byte buffer[PAGE_SIZE];
-  memmove(buffer, old_page, PAGE_SIZE);
+  memcpy(buffer, old_page, PAGE_SIZE);
 
   uint16_t threshold = (PAGE_SIZE - LEAF_PAGE_HEADER_SIZE) / 2;
   uint16_t consumed_space = 0;
 
   LeafPageHeader* page_header = reinterpret_cast<LeafPageHeader*>(buffer);
-  SlotArrayElement* slot_array_start = reinterpret_cast<SlotArrayElement*>(old_page + LEAF_PAGE_HEADER_SIZE);
-  SlotArrayElement* slot_array_new_page_start = reinterpret_cast<SlotArrayElement*>(old_page + LEAF_PAGE_HEADER_SIZE);
+  SlotArrayElement* slot_array_start = reinterpret_cast<SlotArrayElement*>(buffer + LEAF_PAGE_HEADER_SIZE);
+  SlotArrayElement* slot_array_new_page_start = reinterpret_cast<SlotArrayElement*>(buffer + LEAF_PAGE_HEADER_SIZE);
 
   for (int i=0; i < page_header->slot_array_size; i++) {
     SlotArrayElement* current = slot_array_start + i;
     consumed_space = consumed_space + current->length;
     if (consumed_space > threshold) {
       slot_array_new_page_start = current + 1;      
+      break;
     };
   };
 
@@ -79,6 +80,11 @@ bool LeafPage::MakePage(Byte* page, SlotArrayElement* slot_array_start, uint16_t
   page_header->page_id = pid;
   page_header->left_pid = left_pid;
   page_header->right_pid = right_pid;
+
+  if (slot_array_size == 0) {
+    page_header->free_space_end_offset = PAGE_SIZE - 1;
+    return true;
+  };
 
   SlotArrayElement* slot_array = reinterpret_cast<SlotArrayElement*>(page + LEAF_PAGE_HEADER_SIZE);
 

@@ -4,7 +4,25 @@
 // b-tree only talks to buffer pool so buffer pool need to allocate fresh page
 // and also need to deal with freshly freed page.
 
-BTree::BTree(BufferPool &bf) { this->buffer_pool = &bf; };
+BTree::BTree(BufferPool &bf, PageID root_id) { 
+  this->buffer_pool = &bf;
+
+  if (root_id == 0) {
+    Result<NewPage> new_page_result = buffer_pool->AllocateNewPage();
+    root_page_id = new_page_result.value.pid;
+
+    LeafPage::MakePage(new_page_result.value.ptr, nullptr, 0, nullptr, root_page_id, 0, 0);
+    buffer_pool->ReleasePage(root_page_id, true);
+    std::cout << "[BTree] Created new tree. Root is PID: " << root_page_id << "\n";
+  } else {
+    root_page_id = root_id;
+    std::cout << "[BTree] Loaded tree at Root PID: " << root_page_id << "\n";
+  };
+};
+
+PageID BTree::GetRootPageID() const {
+  return root_page_id;
+};
 
 bool BTree::InsertTuple(const Byte *buffer, BufferSize buffer_size, Key key) {
 
@@ -15,10 +33,12 @@ bool BTree::InsertTuple(const Byte *buffer, BufferSize buffer_size, Key key) {
     Result<NewPage> new_root_result = buffer_pool->AllocateNewPage();
     // handle error
     PageID new_root_id = new_root_result.value.pid;
+    std::cout << "NEW ROOT PID: "<<new_root_id << std::endl;
     Key keys_ptr[1] = { report.boundary_key };
     PageID children_ptr[2] = { root_page_id, report.new_page_id };
     InternalPage::MakePage(new_root_result.value.ptr, keys_ptr, children_ptr, 1, new_root_id);
     root_page_id = new_root_id;
+    buffer_pool->ReleasePage(root_page_id, true);
   };
 
   // WriteStatus returns the pointer to the byte that starts at overflow flag of 1 byte and followed by 2 bytes of overflow_page_id
@@ -152,31 +172,33 @@ WriteStatus BTree::WriteChunkLeaf(Byte* page, const Byte *buffer, BufferSize buf
   uint16_t data_size = SLOT_SIZE + TUPLE_HEADER_SIZE + std::min(buffer_size, MAX_LEAF_PAGE_DATA);
   uint16_t available_space = LeafPage::CheckAvailableSpace(page);
   LeafPageHeader* page_header = reinterpret_cast<LeafPageHeader*>(page);
-
+  
   if (data_size <= available_space) {
 
     uint16_t payload_size = TUPLE_HEADER_SIZE + std::min(buffer_size, MAX_LEAF_PAGE_DATA);
 
     SlotArrayElement* slot_array_start = reinterpret_cast<SlotArrayElement*>(page + LEAF_PAGE_HEADER_SIZE);
-    SlotArrayElement* slot_array_end = reinterpret_cast<SlotArrayElement*>(page + (SLOT_SIZE * page_header->slot_array_size));
+    SlotArrayElement* slot_array_end = reinterpret_cast<SlotArrayElement*>(page + LEAF_PAGE_HEADER_SIZE + (SLOT_SIZE * page_header->slot_array_size));
 
     SlotArrayElement* it = LeafPage::upper_bound(slot_array_start, slot_array_end, page, key);
-    if (it != slot_array_end) memmove(it+SLOT_SIZE, it, (slot_array_end - it) * SLOT_SIZE);
 
+    if (it != slot_array_end) memmove(it+1, it, (slot_array_end - it) * SLOT_SIZE);
+    
     it->offset = page_header->free_space_end_offset - payload_size + 1;
     it->length = payload_size;
 
     page_header->free_space_end_offset = it->offset - 1;
+    page_header->slot_array_size++;
 
-    memcpy(page + it->offset, buffer, payload_size); 
-    return { .written = payload_size, .overflow_info_store_address = nullptr };
+    memcpy(page + it->offset + TUPLE_HEADER_SIZE, buffer, payload_size - TUPLE_HEADER_SIZE); 
+    return { .written = (uint16_t)(payload_size - TUPLE_HEADER_SIZE), .overflow_info_store_address = page + it->offset };
 
   } else {
 
     uint16_t payload_size = available_space - SLOT_SIZE;
 
     SlotArrayElement* slot_array_start = reinterpret_cast<SlotArrayElement*>(page + LEAF_PAGE_HEADER_SIZE);
-    SlotArrayElement* slot_array_end = reinterpret_cast<SlotArrayElement*>(page + (SLOT_SIZE * page_header->slot_array_size));
+    SlotArrayElement* slot_array_end = reinterpret_cast<SlotArrayElement*>(page + LEAF_PAGE_HEADER_SIZE + (SLOT_SIZE * page_header->slot_array_size));
 
     SlotArrayElement* it = LeafPage::upper_bound(slot_array_start, slot_array_end, page, key);
     if (it != slot_array_end) memmove(it+SLOT_SIZE, it, (slot_array_end - it) * SLOT_SIZE);
@@ -185,8 +207,9 @@ WriteStatus BTree::WriteChunkLeaf(Byte* page, const Byte *buffer, BufferSize buf
     it->length = payload_size;
 
     page_header->free_space_end_offset = it->offset - 1;
+    page_header->slot_array_size++;
 
-    memcpy(page + it->offset, buffer, payload_size); 
+    memcpy(page + it->offset + TUPLE_HEADER_SIZE, buffer, (uint16_t)(payload_size - TUPLE_HEADER_SIZE)); 
     return { .written = payload_size, .overflow_info_store_address = page + it->offset };
   };
 };
@@ -216,7 +239,7 @@ SearchResult BTree::Search(PageID pid, Key key) {
     
     PageID child_pid = InternalPage::GetChildPageID(page, key);
     buffer_pool->ReleasePage(pid, false);
-    return BTree::Search(pid, key);
+    return BTree::Search(child_pid, key);
 
   } else if (general_page_header->page_type == PageType::LeafPage) {
 

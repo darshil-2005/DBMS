@@ -4,6 +4,7 @@
 #include "./page.h"
 #include <cstring>
 #include <algorithm>
+#include <iostream>
 
 // Notes: 
 // Can implement streaming for very large tuples.

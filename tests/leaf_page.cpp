@@ -1,5 +1,7 @@
 #include "./utils/catch.hpp"
 #include "../src/include/page/leaf_page.h"
+#include "../src/include/b-tree/b-tree.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -126,7 +128,7 @@ TEST_CASE("Lowerbound function for inserting slot elements.", "[binary_search") 
   }
 };
 
-TEST_CASE("LeafPage core operations and data size variations", "[leaf_page]") {
+TEST_CASE("Search function in leaf page correctly returns appropriate SearchResult.", "[leaf_page]") {
     Byte page[4096];
     SlotArrayElement *slots = reinterpret_cast<SlotArrayElement *>(page + LEAF_PAGE_HEADER_SIZE);
     uint8_t page_type = 3;
@@ -215,4 +217,95 @@ TEST_CASE("LeafPage core operations and data size variations", "[leaf_page]") {
         SearchResult res_not_found = LeafPage::Search(page, 151);
         REQUIRE(res_not_found.ptr == nullptr);
     }
-}
+};
+
+TEST_CASE("Search function in leaf page correctly returns appropriate SearchResult.", "[leaf_page]") {
+    Byte page[4096];
+    SlotArrayElement *slots = reinterpret_cast<SlotArrayElement *>(page + LEAF_PAGE_HEADER_SIZE);
+    uint8_t page_type = 3;
+    uint16_t page_id = 66;
+    uint16_t free_space_end_offset = 4095;
+    PageID prev_pid = 66;
+    PageID next_pid = 66;
+    PageID parent_pid = 66;
+
+    auto reset_page = [&](uint16_t num_slots) {
+        std::memset(page, 0, 4096);
+        std::memcpy(page, &page_type, 1);
+        std::memcpy(page + 1, &page_id, 2);
+        std::memcpy(page + 3, &free_space_end_offset, 2);
+        std::memcpy(page + 5, &num_slots, 2);
+        std::memcpy(page + 7, &prev_pid, 2);
+        std::memcpy(page + 9, &next_pid, 2);
+        std::memcpy(page + 11, &parent_pid, 2);
+    };
+
+    SECTION("Search retrieves correct tuples when exactly 3 exist") {
+        reset_page(3);
+        manually_insert_tuple(page, slots, 0, 4000, 10);
+        manually_insert_tuple(page, slots, 1, 3950, 20);
+        manually_insert_tuple(page, slots, 2, 3900, 30);
+
+        SearchResult res1 = LeafPage::Search(page, 10);
+        REQUIRE(res1.ptr != nullptr);
+        REQUIRE(*reinterpret_cast<int16_t*>(res1.ptr + TUPLE_HEADER_SIZE) == 10);
+
+        SearchResult res2 = LeafPage::Search(page, 20);
+        REQUIRE(res2.ptr != nullptr);
+        REQUIRE(*reinterpret_cast<int16_t*>(res2.ptr + TUPLE_HEADER_SIZE) == 20);
+
+        SearchResult res3 = LeafPage::Search(page, 30);
+        REQUIRE(res3.ptr != nullptr);
+        REQUIRE(*reinterpret_cast<int16_t*>(res3.ptr + TUPLE_HEADER_SIZE) == 30);
+    }
+
+    SECTION("Search returns null when looking for non-existent keys") {
+        reset_page(3);
+        manually_insert_tuple(page, slots, 0, 4000, 10);
+        manually_insert_tuple(page, slots, 1, 3950, 20);
+        manually_insert_tuple(page, slots, 2, 3900, 30);
+
+        SearchResult res_missing_low = LeafPage::Search(page, 5);
+        REQUIRE(res_missing_low.ptr == nullptr);
+
+        SearchResult res_missing_mid = LeafPage::Search(page, 25);
+        REQUIRE(res_missing_mid.ptr == nullptr);
+
+        SearchResult res_missing_high = LeafPage::Search(page, 99);
+        REQUIRE(res_missing_high.ptr == nullptr);
+    }
+
+    SECTION("Search safely handles an entirely empty page") {
+        reset_page(0);
+        
+        SearchResult res = LeafPage::Search(page, 10);
+        REQUIRE(res.ptr == nullptr);
+    }
+
+    SECTION("Search scales correctly with a large volume of tuples") {
+        uint16_t num_tuples = 60;
+        reset_page(num_tuples);
+
+        uint16_t current_offset = 4050;
+        for (int i = 0; i < num_tuples; i++) {
+            int16_t key = (i + 1) * 5;
+            current_offset -= 50;
+            manually_insert_tuple(page, slots, i, current_offset, key);
+        }
+
+        SearchResult res_first = LeafPage::Search(page, 5);
+        REQUIRE(res_first.ptr != nullptr);
+        REQUIRE(*reinterpret_cast<int16_t*>(res_first.ptr + TUPLE_HEADER_SIZE) == 5);
+
+        SearchResult res_mid = LeafPage::Search(page, 150);
+        REQUIRE(res_mid.ptr != nullptr);
+        REQUIRE(*reinterpret_cast<int16_t*>(res_mid.ptr + TUPLE_HEADER_SIZE) == 150);
+
+        SearchResult res_last = LeafPage::Search(page, 300);
+        REQUIRE(res_last.ptr != nullptr);
+        REQUIRE(*reinterpret_cast<int16_t*>(res_last.ptr + TUPLE_HEADER_SIZE) == 300);
+
+        SearchResult res_not_found = LeafPage::Search(page, 151);
+        REQUIRE(res_not_found.ptr == nullptr);
+    }
+};

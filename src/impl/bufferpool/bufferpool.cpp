@@ -18,6 +18,20 @@ BufferPool::BufferPool(StorageManager &sm_input) {
 };
 
 BufferPool::~BufferPool() {
+
+  for (int index=0; index<POOL_SIZE; index++) {
+    BufferFrameMeta &frame_meta = buffer_pool_meta[index];
+
+    if (frame_meta.is_dirty) {
+      PageID pid = frame_meta.page_id;
+      Offset offset = PAGE_SIZE * index;
+      Result<bool> write_status =
+          storage_manager->WritePage(pid, buffer_pool + offset);
+      std::cout << pid << std::endl;
+      frame_meta.is_dirty = false;
+    };
+  };
+
   if (buffer_pool != nullptr) {
     free(buffer_pool);
   };

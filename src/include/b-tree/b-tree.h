@@ -42,6 +42,7 @@ struct WriteStatus {
 
 class BTree {
   
+  public:
   PageID root_page_id;
   BufferPool* buffer_pool;
 
@@ -49,12 +50,15 @@ class BTree {
   // for this implementation we will assume the primary key is always 2 bytes and only allow indexing on those sizes.
   // The primary key will be kept immutable (both value and type).
 
-  BTree(BufferPool& bf);
+  BTree(BufferPool& bf, PageID root_id);
 
   bool InsertTuple(const Byte* buffer, BufferSize buffer_size, Key key);
   SplitReport FindPageToWrite(PageID pid, Key key, BufferSize buffer_size, NewPage *to_write_page);
   WriteStatus WriteChunkLeaf(Byte* page, const Byte* buffer, BufferSize buffer_size, Key key);
   WriteStatus WriteChunkOverflow(Byte* page, const Byte* buffer, BufferSize buffer_size);
   SearchResult Search(PageID pid, Key key);
+  PageID GetRootPageID() const;
 };
+
+
 

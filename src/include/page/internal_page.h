@@ -4,6 +4,7 @@
 #include "./page.h"
 #include <cstring>
 #include <algorithm>
+#include <iostream>
 
 constexpr uint16_t INTERNAL_PAGE_HEADER_SIZE = 5;
 constexpr uint16_t NUM_KEY_SLOTS = 1022;

@@ -116,6 +116,8 @@ Bool InternalPage::MakePage(Byte* page, Key* keys_ptr, PageID* children_ptr, uin
 
   curr = curr + sizeof(*keys_ptr) * NUM_KEY_SLOTS;
   memcpy(curr, children_ptr, sizeof(*children_ptr) * (keys_to_take + 1));
+
+  InternalPageHeader* ph = reinterpret_cast<InternalPageHeader*>(page);
   
   return 1;
 };
