@@ -27,7 +27,6 @@ BufferPool::~BufferPool() {
       Offset offset = PAGE_SIZE * index;
       Result<bool> write_status =
           storage_manager->WritePage(pid, buffer_pool + offset);
-      std::cout << pid << std::endl;
       frame_meta.is_dirty = false;
     };
   };

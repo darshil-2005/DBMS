@@ -2,6 +2,7 @@
 #include "../../commons/types.h"
 #include "../../commons/constants.h"
 #include "./page.h"
+#include "../bufferpool/bufferpool.h"
 #include <cstring>
 #include <algorithm>
 #include <iostream>
@@ -32,7 +33,7 @@ constexpr uint16_t SLOT_SIZE = 4;
 constexpr uint16_t OVERFLOW_PAGE_HEADER_SIZE = 6;
 constexpr uint16_t OVERFLOW_PAGE_OVERFLOW_INFO_OFFSET = 3;
 constexpr uint16_t OVERFLOW_TUPLE_DATA_SIZE_MAX = 1280;
-constexpr uint16_t TUPLE_HEADER_SIZE = 3;
+constexpr uint16_t TUPLE_HEADER_SIZE = 7;
 constexpr uint16_t MIN_LEAF_PAGE_DATA = 128 - TUPLE_HEADER_SIZE - SLOT_SIZE;
 constexpr uint16_t MAX_LEAF_PAGE_DATA = 1280 - TUPLE_HEADER_SIZE - SLOT_SIZE;
 
@@ -41,6 +42,12 @@ struct __attribute__((__packed__)) OverflowInfo {
   PageID overflow_page;
 };
   
+struct __attribute__((__packed__)) TupleHeader {
+  Bool overflow;
+  PageID overflow_page;
+  uint32_t size;
+};
+
 struct __attribute__((__packed__)) SlotArrayElement {
   PageOffset offset;
   uint16_t length;
@@ -69,6 +76,35 @@ struct __attribute__((__packed__)) LeafPageHeader {
   PageID right_pid;
 };
 
+struct SearchResult {
+  bool found;
+  Offset tuple_offset;
+  Offset tuple_end_offset;
+  size_t total_tuple_size;
+  bool overflow;
+  PageID overflow_page_id;
+};
+
+class PayloadStream {
+
+  public:
+    BufferPool* buffer_pool;
+    PageID curr_pid;
+    Offset curr_page_offset;
+    Offset curr_page_end;
+
+    size_t total_bytes;
+    size_t bytes_read;
+
+    bool overflow;
+    PageID overflow_page_id;
+
+    PayloadStream();
+    PayloadStream(BufferPool *bf, PageID leaf_pid, Offset tuple_offset, Offset tuple_end_offset, size_t total_tuple_size, bool overflow, PageID overflow_page_id);
+    size_t NextBytes(Byte* buffer, size_t n);
+    Offset ReadPage(Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset);
+};
+
 namespace LeafPage {
   // SlotArrayElement* slot_array;
   // data : slot array | free space | tuples
@@ -80,4 +116,6 @@ namespace LeafPage {
   SlotArrayElement* upper_bound(SlotArrayElement* start, SlotArrayElement* end, Byte* page, Key x);
   SlotArrayElement* lower_bound(SlotArrayElement* start, SlotArrayElement* end, Byte* page, Key x);
   Key GetKeyFromSlotElement(Byte* page, SlotArrayElement* element); 
+  Offset ReadPage(Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset);
+  uint32_t GetTupleSizeFromSlotElement(Byte* page, SlotArrayElement* element);
 };

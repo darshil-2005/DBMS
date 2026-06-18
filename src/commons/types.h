@@ -37,11 +37,6 @@ struct __attribute__((__packed__)) NewPage {
   PageID pid;
 };
 
-struct __attribute__((__packed__)) SearchResult {
-  TupleLength size;
-  Byte* ptr;
-};
-
 enum ErrType {
 
   None,

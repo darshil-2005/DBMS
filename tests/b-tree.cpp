@@ -2,6 +2,7 @@
 #include "../src/include/bufferpool/bufferpool.h"
 #include "../src/include/storageManager/storageManager.h"
 #include "../src/include/b-tree/b-tree.h"
+#include <string>
 
 void DumpPage(Byte* page) {
   LeafPageHeader* page_header = reinterpret_cast<LeafPageHeader*>(page);
@@ -98,7 +99,6 @@ TEST_CASE("WriteChunkLeaf write properly to the leaf", "[b-tree]") {
 };
 */
 
-/*
 TEST_CASE("gdsfbfds", "[vsfvbf]") {
 
   fs::remove_all(DATA_DIR);
@@ -108,28 +108,141 @@ TEST_CASE("gdsfbfds", "[vsfvbf]") {
   BufferPool bp(sm);
   BTree bt(bp, 0);
 
-  for (int i=0; i<10; i++) {
-    Byte buffer[500];
-    Key key = 69 + i;
-    memcpy(buffer, &key, sizeof(Key));
-    bt.InsertTuple(buffer, 600 + 5 * (i+1), key);
-  };
-  
-  SearchResult sr = bt.Search(bt.root_page_id, 69 + 3);
-  // 120
-  // std::cout << sr.size << std::endl;
-  // std::cout << bt.root_page_id << std::endl;
-};
-*/
+  std::string s = R"(Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat ultrices sem, sed tincidunt augue hendrerit at. Vestibulum ante ipsum primisin faucibus orci luctus et ultrices posuere cubilia curae; Donec vulputate
+ornare eros, non porttitor nisi ullamcorper vitae. Sed volutpat, lectus quis
+congue sollicitudin, ligula neque tristique nisl, quis efficitur turpis lorem
+nec nisi. Suspendisse potenti. Curabitur faucibus magna sit amet metus
+imperdiet, non volutpat lacus pulvinar. Mauris dignissim sapien at purus
+tristique, eu consequat risus fermentum. Pellentesque habitant morbi tristique
+senectus et netus et malesuada fames ac turpis egestas.
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
+The quick brown fox jumps over the lazy dog.
+Pack my box with five dozen liquor jugs.
+Sphinx of black quartz, judge my vow.
+How vexingly quick daft zebras jump.
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+01234567890123456789012345678901234567890123456789012345678901234567890123456789
+98765432109876543210987654321098765432109876543210987654321098765432109876543210
+This is a long string intended for testing serialization, deserialization,
+buffer writes, page layouts, tuple storage, variable length records, and
+general data stream parsing functionality. The goal is to ensure that copying
+data into and out of byte buffers works correctly even when the payload spans
+hundreds or thousands of bytes and contains a mix of whitespace, punctuation,
+letters, and numbers.)";
 
+// std::string s = "!!DARshil!!";
+
+std::cout << "String Length Before: " << s.size() << std::endl;
+
+  Byte buffer1[968];
+  Byte buffer2[256];
+  Byte buffer3[360];
+  Byte buffer4[2000];
+  Byte buffer5[750];
+  Byte buffer6[128];
+
+  memset(buffer1, 'D', 968);
+  memset(buffer2, 'E', 256);
+  memset(buffer3, 'F', 360);
+  memset(buffer4, 'G', 2000);
+  memset(buffer5, 'H', 750);
+  memset(buffer6, 'I', 128);
+  memcpy(buffer4 + sizeof(Key), s.data(), s.size());
+
+  Key b1 = 10;
+  Key b2 = 20;
+  Key b3 = 69;
+  Key b4 = 25;
+  Key b5 = 45;
+  Key b6 = 2;
+
+  memcpy(buffer1, &b1, sizeof(Key));
+  memcpy(buffer2, &b2, sizeof(Key));
+  memcpy(buffer3, &b3, sizeof(Key));
+  memcpy(buffer4, &b4, sizeof(Key));
+  memcpy(buffer5, &b5, sizeof(Key));
+  memcpy(buffer6, &b6, sizeof(Key));
+
+  bt.InsertTuple(buffer1, 968, b1);
+  bt.InsertTuple(buffer2, 256, b2);
+  bt.InsertTuple(buffer3, 360, b3);
+  bt.InsertTuple(buffer4, 2 + s.size(), b4);
+  bt.InsertTuple(buffer5, 750, b5);
+  bt.InsertTuple(buffer6, 128, b6);
+
+  PayloadStream sr = bt.Search(bt.root_page_id, 25);
+  Byte response[2000];
+
+  std::cout << sr.NextBytes(response, 2000) << std::endl;
+
+  Key recovered_key;
+  memcpy(&recovered_key, response, sizeof(Key));
+
+  std::cout << "Recovered key: " << recovered_key << std::endl;
+
+  std::string ret(reinterpret_cast<char*>(response + sizeof(Key)), s.size());
+
+  std::cout << "RETRIEVED STRING LENGTH: " << ret.size() << std::endl;
+  std::cout << "RETRIEVED STRING: " << ret << std::endl;
+  std::cout << "T: " << sr.total_bytes << std::endl;
+  std::cout << "T: " << sr.bytes_read << std::endl;
+
+};
+
+/*
 TEST_CASE("gdsfbfrgqwerds", "[vsfvbf]") {
 
   StorageManager sm;
   REQUIRE(sm.Bootstrap() == true);
   BufferPool bp(sm);
-  BTree bt(bp, 5);
+  BTree bt(bp, 2);
 
-  SearchResult sr = bt.Search(bt.root_page_id, 69 + 3);
-  // 120
-  std::cout << sr.size << std::endl;
+  SearchResult sr = bt.Search(bt.root_page_id, 69);
+
+  Byte response[100];
+  memcpy(response, sr.ptr, 100);
+
+  TupleHeader* th = reinterpret_cast<TupleHeader*>(response);
+  std::cout << "Overflow: " << (th->overflow > 0 ? 1 : 0) << std::endl;
+  std::cout << "Overflow Page ID: " << th->overflow_page << std::endl;
+  std::cout << "Size: " << th->size << std::endl;
+
+  uint16_t kk;
+  memcpy(&kk, response + TUPLE_HEADER_SIZE, sizeof(uint16_t));
+  std::cout << "Retrived Key: " << kk << std::endl;
+  std::string ret(reinterpret_cast<char*>(response + TUPLE_HEADER_SIZE + sizeof(Key)), 14);
+  std::cout << "Retrived String: " << ret << std::endl;
 };
+
+
+TEST_CASE("WriteChunkLeaf writes the data inside the page properly and returns the number of bytes written.", "[b-tree]") {
+  
+  Byte data[500];
+  Key k = 5;
+  memset(data, 'B', 500);
+  memcpy(data, &k, sizeof(Key));
+
+  Byte page[PAGE_SIZE];
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
+*/

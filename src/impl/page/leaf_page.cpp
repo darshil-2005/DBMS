@@ -133,6 +133,11 @@ Key LeafPage::GetKeyFromSlotElement(Byte* page, SlotArrayElement* element) {
   return key;
 };
 
+uint32_t LeafPage::GetTupleSizeFromSlotElement(Byte* page, SlotArrayElement* element) {
+  TupleHeader* tuple_header = reinterpret_cast<TupleHeader*>(page + element->offset);
+  return tuple_header->size;
+};
+
 SearchResult LeafPage::Search(Byte* page, Key key) {
   
   LeafPageHeader* page_header = reinterpret_cast<LeafPageHeader*>(page);
@@ -141,17 +146,105 @@ SearchResult LeafPage::Search(Byte* page, Key key) {
   SlotArrayElement* search_result = LeafPage::lower_bound(slot_array_start, slot_array_end, page, key);
 
   if (search_result == slot_array_end) {
-    return { .size = 0, .ptr = nullptr };
+    return { .found = false, .tuple_offset = 0, .tuple_end_offset = 0, .total_tuple_size = 0, .overflow = false, .overflow_page_id = 0 };
   };
 
   Key returned_key = LeafPage::GetKeyFromSlotElement(page, search_result);
+  TupleHeader* tuple_header = reinterpret_cast<TupleHeader*>(page + search_result->offset);
+  size_t tuple_size = tuple_header->size;
+  bool overflow = (tuple_header->overflow > 0) ? true : false;
+  PageID overflow_page_id = tuple_header->overflow_page;
+  
 
   if (returned_key == key) {
-    return { .size = search_result->length, .ptr = page + search_result->offset };
+    return { 
+      .found = true,
+      .tuple_offset = search_result->offset,
+      .tuple_end_offset = (Offset)(search_result->offset + search_result->length),
+      .total_tuple_size = tuple_size,
+      .overflow = overflow, 
+      .overflow_page_id = overflow_page_id };
   };
 
-  return { .size = 0, .ptr = nullptr };
+  return { .found = false, .tuple_offset = 0, .tuple_end_offset = 0, .total_tuple_size = 0, .overflow = false, .overflow_page_id = 0 };
 };
 
+PayloadStream::PayloadStream() {
+  buffer_pool = nullptr;
+  curr_pid = 0;
+  curr_page_offset = 0;
+  curr_page_end = 0;
+  total_bytes = 0;
+  bytes_read = 0;
+  overflow = false;
+  overflow_page_id = 0;
+};
 
+PayloadStream::PayloadStream(BufferPool *bf, PageID leaf_pid, Offset tuple_offset, Offset tuple_end_offset, size_t total_tuple_size, bool overflow, PageID overflow_page_id) {
+  buffer_pool = bf;
+  curr_pid = leaf_pid;
+  curr_page_offset = tuple_offset + TUPLE_HEADER_SIZE;
+  curr_page_end = tuple_end_offset;
+  total_bytes = total_tuple_size;
+  bytes_read = 0;
+  this->overflow = overflow;
+  this->overflow_page_id = overflow_page_id;
+};
 
+Offset PayloadStream::ReadPage(Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset) {
+
+  size_t possible_reads = max_offset - start_offset + 1;
+  if (n <= possible_reads) {
+    memcpy(buffer, page + start_offset, n);
+    return start_offset + n;
+  } else {
+    memcpy(buffer, page + start_offset, possible_reads);
+    return start_offset + possible_reads;
+  };
+};
+
+size_t PayloadStream::NextBytes(Byte* buffer, size_t n) {
+  
+  size_t total_possible_read_size = total_bytes - bytes_read;
+  size_t bytes_to_read = std::min(n, total_possible_read_size);
+
+  if (total_possible_read_size == 0) return 0;
+
+  Result<Byte*> curr_page_fetch = buffer_pool->RequestPage(curr_pid);
+  Byte* curr_page = curr_page_fetch.value;
+
+  size_t total_read_this_call = 0;
+
+  while (bytes_to_read > 0) {
+
+    // Returns the offset after the byte it read last.
+    Offset result = PayloadStream::ReadPage(curr_page, buffer + total_read_this_call, bytes_to_read, curr_page_offset, curr_page_end - 1);
+
+    size_t bytes_read_from_page = result - curr_page_offset; 
+    bytes_read += bytes_read_from_page; 
+    bytes_to_read = bytes_to_read - bytes_read_from_page;
+    total_read_this_call += bytes_read_from_page;
+
+    if (result == curr_page_end) {
+      if (overflow) {
+        buffer_pool->ReleasePage(curr_pid, false);
+        curr_pid = overflow_page_id;
+        curr_page_offset = OVERFLOW_PAGE_HEADER_SIZE;
+        curr_page_end = PAGE_SIZE;
+        curr_page_fetch = buffer_pool->RequestPage(curr_pid);
+        curr_page = curr_page_fetch.value;
+        OverflowPageHeader* curr_page_header = reinterpret_cast<OverflowPageHeader*>(curr_page); 
+        overflow = curr_page_header->overflow > 0 ? true : false;
+        overflow_page_id = curr_page_header->overflow_page;
+      } else {
+        break;
+      };
+    } else {
+      curr_page_offset = result;
+      break;
+    }
+  };
+  
+  buffer_pool->ReleasePage(curr_pid, false);
+  return total_read_this_call;
+};
