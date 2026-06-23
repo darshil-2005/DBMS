@@ -352,12 +352,38 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
           // handle errors
           Byte* from_page = from_page_request.value;
 
+          // InternalPage::DumpPage(page);
+          /*
+          std::cout << "Merge with Left: " << left_pid_check.value << ", " << child_pid << std::endl;
+          
+          std::cout << "======================================" << std::endl;
+          LeafPage::DumpPage(to_page);
+          LeafPage::DumpPage(from_page);
+          */
+
           LeafPage::MergePages(to_page, from_page);
+          
+          /*
+          LeafPage::DumpPage(to_page);
+          LeafPage::DumpPage(from_page);
+          std::cout << "======================================" << std::endl;
+          */
+
+          LeafPageHeader* to_page_header = reinterpret_cast<LeafPageHeader*>(to_page);
+
+          if (to_page_header->right_pid != 0) {
+            Result<Byte*> neighbour_request = buffer_pool->RequestPage(to_page_header->right_pid);
+            Byte* neighbour = neighbour_request.value;
+            LeafPageHeader* neighbour_header = reinterpret_cast<LeafPageHeader*>(neighbour);
+            neighbour_header->left_pid = to_page_header->page_id;
+          };
+
           InternalPage::DeleteKeyAndChildPtr(page, child_pid, left_pid_check.value);
 
           InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(page);
           if (page_header->page_id == root_page_id && page_header->num_keys == 0) {
             PageID* child_ptr = InternalPage::GetChildrenStartPointer(page);
+
             root_page_id = *child_ptr;
             // release the current page completely
             buffer_pool->ReleasePage(pid, false);
@@ -366,17 +392,6 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
             return { .underflown = false, .page_type = PageType::InvalidPage, .current_size = 0 };
           };
 
-
-          /*
-          InternalPage::DumpPage(page);
-
-          std::cout << "===================================================================" << std::endl;
-          std::cout << "Merge with Left: " << std::endl;
-          std::cout << "Current Page: " << pid << std::endl;
-          std::cout << "Left Page: " << left_pid_check.value << std::endl;
-          std::cout << "Right Page: " << child_pid << std::endl;
-          std::cout << "===================================================================" << std::endl;
-          */
 
           uint16_t usedspace;
           bool underflow_happened = InternalPage::CheckUnderflow(page, usedspace);
@@ -398,22 +413,51 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
           // handle errors
           Byte* from_page = from_page_request.value;
 
-          InternalPage::DumpPage(page);
+          // std::cout << "\n===================================================================="<< std::endl;
+          // InternalPage::DumpPage(page);
+          // std::cout << "====================================================================\n"<< std::endl;
+          // LeafPage::DumpPageFirstLast(to_page);
+          // LeafPage::DumpPageFirstLast(from_page);
 
-
-          std::cout << "===============================================================" << std::endl;
+          /*
+          std::cout << "\n================ Before Merge ======================" << std::endl;
           LeafPage::DumpPage(to_page);
-          std::cout << "===============================================================" << std::endl;
-          std::cout << "===============================================================" << std::endl;
-          LeafPage::DumpPageFirstLast(from_page);
-          std::cout << "===============================================================" << std::endl;
+          LeafPage::DumpPage(from_page);
+          std::cout << "\n================ Before Merge ======================" << std::endl;
+          */
+
           LeafPage::MergePages(to_page, from_page);
+          
+          /*
+          std::cout << "\n================ After Merge ======================" << std::endl;
+          LeafPage::DumpPage(to_page);
+          LeafPage::DumpPage(from_page);
+          std::cout << "\n================ After Merge ======================" << std::endl;
+          */
           InternalPage::DeleteKeyAndChildPtr(page, right_pid_check.value, child_pid);
+
+          LeafPageHeader* to_page_header = reinterpret_cast<LeafPageHeader*>(to_page);
+
+          if (to_page_header->right_pid != 0) {
+            Result<Byte*> neighbour_request = buffer_pool->RequestPage(to_page_header->right_pid);
+            Byte* neighbour = neighbour_request.value;
+            LeafPageHeader* neighbour_header = reinterpret_cast<LeafPageHeader*>(neighbour);
+            neighbour_header->left_pid = to_page_header->page_id;
+          };
+          std::cout << "Merge with Right: " << child_pid << ", " << right_pid_check.value << std::endl;
+          // std::cout << "\n===================================================================="<< std::endl;
+          // InternalPage::DumpPage(page);
+          // std::cout << "====================================================================\n"<< std::endl;
 
           InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(page);
           if (page_header->page_id == root_page_id && page_header->num_keys == 0) {
             PageID* child_ptr = InternalPage::GetChildrenStartPointer(page);
             root_page_id = *child_ptr;
+
+            std::cout << "Root has zero keys." << std::endl;
+            std::cout << "New Root: " << root_page_id << std::endl << std::endl;
+
+            buffer_pool->ReleasePage(*child_ptr, false);
             // release the current page completely
             buffer_pool->ReleasePage(pid, false);
             buffer_pool->ReleasePage(child_pid, false);
@@ -421,13 +465,17 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
             return { .underflown = false, .page_type = PageType::InvalidPage, .current_size = 0 };
           };
 
+          /*
           InternalPage::DumpPage(page);
           std::cout << "===================================================================" << std::endl;
-          std::cout << "Merge with Right: " << std::endl;
+          */
+          // std::cout << "Merge with Right: " << child_pid << ", " << right_pid_check.value << std::endl;
+          /*
           std::cout << "Current Page: " << pid << std::endl;
           std::cout << "Left Page: " << child_pid << std::endl;
           std::cout << "Right Page: " << right_pid_check.value << std::endl;
           std::cout << "===================================================================" << std::endl;
+          */
 
           uint16_t usedspace;
           bool underflow_happened = InternalPage::CheckUnderflow(page, usedspace);

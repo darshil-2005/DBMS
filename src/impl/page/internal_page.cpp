@@ -213,16 +213,12 @@ void InternalPage::DeleteKeyAndChildPtr(Byte* page, PageID merged_page, PageID a
 
   InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(page);
 
-  page_header->num_keys--;
-
   Key* key_ptr;
   key_ptr = InternalPage::FindKeyFromChildren(page, absorbing_page, merged_page);
 
   Key key = *key_ptr;
-
   Key* keys_start = InternalPage::GetKeysStartPointer(page);
   Key* keys_end = keys_start + page_header->num_keys;
-
   Key* iter_key = std::lower_bound(keys_start, keys_end, key);
   
   if (keys_end - iter_key > 1) memmove(iter_key, iter_key + 1, keys_end - iter_key - 1);
@@ -233,6 +229,7 @@ void InternalPage::DeleteKeyAndChildPtr(Byte* page, PageID merged_page, PageID a
   PageID* iter_child = std::find(childptr_start, childptr_end, merged_page);
 
   if (childptr_end - iter_child > 1) memmove(iter_child, iter_child + 1, childptr_end - iter_child - 1);
+  page_header->num_keys--;
 
   return;  
 };

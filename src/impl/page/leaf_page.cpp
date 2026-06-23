@@ -119,6 +119,7 @@ bool LeafPage::MakePage(Byte* page, SlotArrayElement* slot_array_start, uint16_t
   page_header->page_id = pid;
   page_header->left_pid = left_pid;
   page_header->right_pid = right_pid;
+  page_header->garbage_bytes = 0;
 
   if (slot_array_size == 0) {
     page_header->slot_array_size = 0;
@@ -207,7 +208,7 @@ uint32_t LeafPage::GetTupleSizeFromSlotElement(Byte* page, SlotArrayElement* ele
 void LeafPage::DumpPageFirstLast(Byte *page) {
   LeafPageHeader *page_header = reinterpret_cast<LeafPageHeader *>(page);
 
-  std::cout << "=============== LEAF PAGE ===============" << std::endl;
+  std::cout << "\n==================================== LEAF PAGE ========================================" << std::endl;
   std::cout << "=============== LEAF PAGE HEADER ===============" << std::endl;
   std::cout << "Page Type: " << static_cast<int>(page_header->page_type)
             << std::endl;
@@ -218,7 +219,7 @@ void LeafPage::DumpPageFirstLast(Byte *page) {
   std::cout << "Left Sibling: " << page_header->left_pid << std::endl;
   std::cout << "Right Sibling: " << page_header->right_pid << std::endl;
   std::cout << "Garbage Bytes: " << page_header->garbage_bytes << std::endl;
-  std::cout << "=============== HEADER END ===============" << std::endl;
+  std::cout << "================= HEADER END =================\n" << std::endl;  
 
   SlotArrayElement *slot_array =
       reinterpret_cast<SlotArrayElement *>(page + LEAF_PAGE_HEADER_SIZE);
@@ -290,24 +291,27 @@ void LeafPage::DumpPage(Byte *page) {
   for (int i = 0; i < page_header->slot_array_size; i++) {
     OverflowInfo *overflow_info =
         reinterpret_cast<OverflowInfo *>(page + slot_array[i].offset);
-    std::cout << "=========================================" << std::endl;
+
+    // if (slot_array[i].is_deleted > 0) {
+    //   std::cout << "ELEMENT DELETED: " << i + 1 << std::endl;
+    // } else {
+    //   std::cout << "Tuple Offset: " << slot_array[i].offset << std::endl;
+    //   std::cout << "Tuple Length: " << slot_array[i].length << std::endl;
+    //   std::cout << "Tuple Overflow: "
+    //             << static_cast<int>(overflow_info->overflow) << std::endl;
+    //   std::cout << "Overflow Page: " << overflow_info->overflow_page
+    //             << std::endl;
+    //   std::cout << "Key: "
+    //             << *reinterpret_cast<uint16_t *>(page + slot_array[i].offset +
+    //                                              TUPLE_HEADER_SIZE)
+    //             << std::endl;
+    // };
 
     if (slot_array[i].is_deleted > 0) {
-      std::cout << "ELEMENT DELETED: " << i + 1 << std::endl;
+      std::cout << "D ";
     } else {
-      std::cout << "Tuple Offset: " << slot_array[i].offset << std::endl;
-      std::cout << "Tuple Length: " << slot_array[i].length << std::endl;
-      std::cout << "Tuple Overflow: "
-                << static_cast<int>(overflow_info->overflow) << std::endl;
-      std::cout << "Overflow Page: " << overflow_info->overflow_page
-                << std::endl;
-      std::cout << "Key: "
-                << *reinterpret_cast<uint16_t *>(page + slot_array[i].offset +
-                                                 TUPLE_HEADER_SIZE)
-                << std::endl;
+      std::cout << *reinterpret_cast<uint16_t *>(page + slot_array[i].offset + TUPLE_HEADER_SIZE) << " ";
     };
-
-    std::cout << "=========================================" << std::endl;
   };
 };
 
@@ -433,7 +437,14 @@ WriteStatus LeafPage::WriteChunkLeaf(Byte* page, Byte *buffer, BufferSize buffer
   
   if (data_size <= total_space) {
     if (data_size > available_space) {
+      /*
+      std::cout << "Defragmenting" << std::endl;
+      LeafPage::DumpPage(page);
       LeafPage::DefragmentPage(page);
+      LeafPage::DumpPage(page);
+      std::cout << "\n\n" << std::endl;
+      */
+      LeafPage::DumpPage(page);
     };
 
     uint16_t payload_size = data_size - SLOT_SIZE;
@@ -694,6 +705,8 @@ void LeafPage::MergePages(Byte* to_page, Byte* from_page) {
 
   to_header->right_pid = from_header->right_pid;
 
+  std::cout << to_header->right_pid << std::endl;
+  std::cout << to_header->slot_array_size<< std::endl;
   // Iterate over the from_page slot and tuple, then insert each of them into the to_page.
   // First insert the slot properly.
   // Then insert the data using the write_chunk function.
@@ -715,6 +728,8 @@ void LeafPage::MergePages(Byte* to_page, Byte* from_page) {
         key, reinterpret_cast<TupleHeader*>(from_page + element->offset));
   };
 
+  std::cout << to_header->right_pid << std::endl;
+  std::cout << to_header->slot_array_size<< std::endl;
   return;
 };
 
@@ -749,7 +764,6 @@ bool LeafPage::DeleteTuple(Byte* page, Key key) {
   LeafPageHeader* page_header = reinterpret_cast<LeafPageHeader*>(page);
   SlotArrayElement* start = reinterpret_cast<SlotArrayElement*>(page + LEAF_PAGE_HEADER_SIZE);
   SlotArrayElement* end = start + page_header->slot_array_size;
-
   SlotArrayElement* element = lower_bound(start, end, page, key);
 
   if (element == end) {

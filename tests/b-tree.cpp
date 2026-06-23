@@ -380,30 +380,18 @@ TEST_CASE("Defragmentation works", "[b-tree][defrag]") {
     bt.Delete(bt.root_page_id, dataset.keys[i]);
   };
 
-  /*
-  InternalPage::DumpPage(bf.RequestPage(4).value);
-  bf.ReleasePage(4, false);
-
-  std::cout << "First Leaf Page\n";
-  LeafPage::DumpPageFirstLast(bf.RequestPage(2).value);
-  bf.ReleasePage(2, false);
-  std::cout << "\n";
-
-  std::cout << "Final Leaf Page\n";
-  LeafPage::DumpPageFirstLast(bf.RequestPage(3).value);
-  bf.ReleasePage(3, false);
-  std::cout << "\n";
-  */
-
+  std::cout << "LOLOLOL2" << std::endl;
   Byte* page = bf.RequestPage(2).value;
+  LeafPage::DumpPage(page);
   LeafPage::DefragmentPage(page);
+  std::cout << "LOLOLOL" << std::endl;
+  LeafPage::DumpPage(page);
   bf.ReleasePage(2, false);
 };
 
 TEST_CASE("Merge works", "[b-tree][delete][leaf_merge]") {
 
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_small.csv");
-  
   REQUIRE(dataset.keys.size() == 60000);
   
   if (fs::exists(DATA_DIR)) {
@@ -416,35 +404,27 @@ TEST_CASE("Merge works", "[b-tree][delete][leaf_merge]") {
   BTree bt(bf, 0);
 
   Byte buffer[100000];
-
-  int num_records = 100;
+  int num_records = 1000;
 
   for (int i=0; i<num_records; i++) {
-
     memcpy(buffer, &dataset.keys[i], sizeof(Key));
     memcpy(buffer + sizeof(Key), dataset.payloads[i].data(), dataset.payloads[i].size());
 
     REQUIRE(bt.InsertTuple(buffer, dataset.payloads[i].size() + sizeof(Key), dataset.keys[i]) == true);
   };
 
-  int nd = 40;
+  int nd = 500;
 
   for (int i=0; i < nd; i++) {
     bt.Delete(bt.root_page_id, dataset.keys[i]);
   };
 
   std::cout << "ROOT PAGE ID: " << bt.root_page_id << std::endl;
-  InternalPage::DumpPage(bf.RequestPage(4).value);
-  bf.ReleasePage(4, false);
 
-  std::cout << "First Leaf Page\n";
-  LeafPage::DumpPageFirstLast(bf.RequestPage(2).value);
+  /*
+  LeafPage::DumpPage(bf.RequestPage(2).value);
   bf.ReleasePage(2, false);
-  std::cout << "\n";
-
-  std::cout << "Final Leaf Page\n";
-  LeafPage::DumpPageFirstLast(bf.RequestPage(3).value);
-  bf.ReleasePage(3, false);
+  */
   std::cout << "\n";
 
   Byte result[100000];
@@ -453,6 +433,9 @@ TEST_CASE("Merge works", "[b-tree][delete][leaf_merge]") {
 
     PayloadStream stream = bt.Search(bt.root_page_id, dataset.keys[i]);
     if (i < nd) {
+      if (stream.curr_pid != 0) {
+        std::cout << "INDEX: " << i << std::endl;
+      };
       REQUIRE(stream.curr_pid == 0);
       continue;
     };
