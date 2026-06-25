@@ -37,23 +37,18 @@
 
 
 class BTree {
-  
-  public:
+  private:
   PageID root_page_id;
   BufferPool* buffer_pool;
-
-  // Some variable that holds info about the key or maybe it shall be passed directly to the functions.
-  // for this implementation we will assume the primary key is always 2 bytes and only allow indexing on those sizes.
-  // The primary key will be kept immutable (both value and type).
-
-  BTree(BufferPool& bf, PageID root_id);
-
-  bool InsertTuple(Byte* buffer, BufferSize buffer_size, Key key);
   SplitReport FindPageToWrite(PageID pid, Key key, BufferSize buffer_size, NewPage *to_write_page);
-  PayloadStream Search(PageID pid, Key key, bool trace_path = false);
-  PageID GetRootPageID() const;
+  PayloadStream Search(PageID pid, Key key);
   DeleteStatus Delete(PageID pid, Key key);
+  void SetNewRoot(PageID new_root_id);
+
+  public:
+  BTree(BufferPool& bf);
+  bool Insert(const Byte* buffer, BufferSize buffer_size, Key key);
+  PageID GetRootPageID() const;
+  PayloadStream Search(Key key);
+  bool Delete(Key key);
 };
-
-
-

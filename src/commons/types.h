@@ -52,7 +52,8 @@ struct WriteStatus {
 struct DeleteStatus {
    bool underflown;
    PageType page_type;
-   uint16_t current_size; // size of slot_array + tuples (for leaf page)
+   uint16_t current_size;
+   bool success;
 };
 
 struct BorrowQuery {
@@ -83,6 +84,8 @@ enum ErrType {
   
   RightLeafSiblingDoesNotExist, 
   LeftLeafSiblingDoesNotExist,
+
+  OperationNotAllowed,
 };
 
 

@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <iostream>
 #include <cstring>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 namespace fs = std::filesystem;
 
@@ -20,17 +22,23 @@ class StorageManager {
   Result<PageId, AllocateErr> AllocatePage();
   Result<OperationStatus, DeallocateErr> DeallocatePage(PageId pid);
   */
+
   private:
-  void RefreshNewPageOffsetIndex();
-  void SetNewPageOffsetIndex(uint64_t new_offset);
-  uint64_t new_page_offset_index;
-  int fd_database;
-  int fd_logs;
+    int fd_database;
+    int fd_logs;
+    void SetNewPageOffsetIndex(uint64_t new_offset);
+    uint64_t new_page_offset_index;
+    Result<bool> PrivateReadPage(PageID pid, Byte* buffer);
+    Result<bool> PrivateWritePage(PageID pid, const Byte* buffer);
+    bool IsDatabaseFile(int file_descriptor);
+
   public:
-  bool Bootstrap();
-  ~StorageManager();
-  uint64_t GetNewPageOffsetIndex();
-  Result<bool> ReadPage(PageID pid, Byte* buffer);
-  Result<bool> WritePage(PageID pid, const Byte* buffer);
-  Result<PageID> AllocateNewPage();
+    bool Bootstrap();
+    ~StorageManager();
+    Result<bool> ReadPage(PageID pid, Byte* buffer);
+    Result<bool> WritePage(PageID pid, const Byte* buffer);
+    Result<PageID> AllocateNewPage();
+
+    // Exposed for testing only
+    uint64_t GetNewPageOffsetIndex();
 };

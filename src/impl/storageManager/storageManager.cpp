@@ -9,19 +9,30 @@ bool StorageManager::Bootstrap() {
     std::cout << "[INIT] Initialized data directory: " << DATA_DIR << std::endl;
   };
 
-  if (fs::exists(DB_PATH)) {
-    fd_database = open(DB_PATH, O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
-  } else {
+  if (!fs::exists(DB_PATH)) {
     fd_database = open(DB_PATH, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
-    uint64_t off_start = 2;
-
+  } else {
+    fd_database = open(DB_PATH, O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
+  };
+  
+  if (!StorageManager::IsDatabaseFile(fd_database)) {
     Byte buffer[PAGE_SIZE];
-    memcpy(buffer, &off_start, sizeof(new_page_offset_index));
-    pwrite(fd_database, buffer, PAGE_SIZE, 0);
+    memset(buffer, 0, PAGE_SIZE);
+    uint32_t magic_to_write = MAGIC_NUMBER;
+    memcpy(buffer, &magic_to_write, MAGIC_NUMBER_SIZE);
+    uint64_t off_start = DATABASE_META_PAGE_ID + 1;
+    memcpy(buffer + MAGIC_NUMBER_SIZE, &off_start, sizeof(uint64_t));
+    StorageManager::PrivateWritePage(STORAGE_MANAGER_META_PAGE_ID, buffer);
+    memset(buffer, 0, PAGE_SIZE); 
+    StorageManager::PrivateWritePage(DATABASE_META_PAGE_ID, buffer);
   };
 
-  fd_logs = open(LOG_PATH, O_WRONLY | O_CREAT | O_APPEND | O_DIRECT,
-                 S_IRUSR | S_IWUSR);
+  // set page offset from the file
+  Byte storage_manager_meta_page[PAGE_SIZE];
+  StorageManager::PrivateReadPage(STORAGE_MANAGER_META_PAGE_ID, storage_manager_meta_page);
+  memcpy(&new_page_offset_index, storage_manager_meta_page + MAGIC_NUMBER_SIZE, sizeof(uint64_t));
+
+  fd_logs = open(LOG_PATH, O_WRONLY | O_CREAT | O_APPEND | O_DIRECT, S_IRUSR | S_IWUSR);
 
   if (fd_database == -1 || fd_logs == -1) {
     if (fd_database != -1) {
@@ -35,26 +46,34 @@ bool StorageManager::Bootstrap() {
     return false;
   };
 
-  StorageManager::RefreshNewPageOffsetIndex();
   return true;
+};
+
+bool StorageManager::IsDatabaseFile(int file_descriptor) {
+
+  struct stat st;
+  if (fstat(fd_database, &st) == -1 || st.st_size < PAGE_SIZE) {
+    return false;
+  };
+
+  Byte page[PAGE_SIZE];
+  Offset off = STORAGE_MANAGER_META_PAGE_ID * PAGE_SIZE;
+  pread(file_descriptor, page, PAGE_SIZE, off);
+  // handle errors
+  uint32_t retrieved_magic_number;
+  memcpy(&retrieved_magic_number, page, MAGIC_NUMBER_SIZE);
+  if (retrieved_magic_number == MAGIC_NUMBER) {
+    return true;
+  };
+  return false;
 };
 
 uint64_t StorageManager::GetNewPageOffsetIndex() {
   return new_page_offset_index;
 };
 
-void StorageManager::RefreshNewPageOffsetIndex() {
-  Byte buffer[PAGE_SIZE];
-  Result<bool> read_result = ReadPage(0, buffer);
-  if (read_result.err != ErrType::None) {
-    // handle error
-  };
-  
-  memcpy(&new_page_offset_index, buffer, sizeof(uint64_t));
-  return;
-};
+Result<bool> StorageManager::PrivateReadPage(PageID pid, Byte *buffer) {
 
-Result<bool> StorageManager::ReadPage(PageID pid, Byte *buffer) {
   Offset off = pid * PAGE_SIZE;
   ssize_t byte_count = pread(fd_database, buffer, PAGE_SIZE, off);
 
@@ -69,7 +88,49 @@ Result<bool> StorageManager::ReadPage(PageID pid, Byte *buffer) {
   return {.value = true, .err = ErrType::None};
 };
 
+Result<bool> StorageManager::ReadPage(PageID pid, Byte *buffer) {
+
+  if (pid == STORAGE_MANAGER_META_PAGE_ID) {
+    return { .value = false, .err = ErrType::OperationNotAllowed };
+  };
+
+  Offset off = pid * PAGE_SIZE;
+  ssize_t byte_count = pread(fd_database, buffer, PAGE_SIZE, off);
+
+  if (byte_count == -1) {
+    return {.value = false, .err = ErrType::SystemErr};
+  };
+
+  if (static_cast<size_t>(byte_count) != PAGE_SIZE) {
+    return {.value = false, .err = ErrType::FileCorruption};
+  }
+
+  return {.value = true, .err = ErrType::None};
+};
+
+Result<bool> StorageManager::PrivateWritePage(PageID pid, const Byte *buffer) {
+
+  Offset off = pid * PAGE_SIZE;
+
+  ssize_t byte_count = pwrite(fd_database, buffer, PAGE_SIZE, off);
+
+  if (byte_count == -1) {
+    return {.value = false, .err = ErrType::SystemErr};
+  };
+
+  if (static_cast<size_t>(byte_count) != PAGE_SIZE) {
+    return {.value = false, .err = ErrType::DiskFullOrTruncated};
+  };
+
+  return {.value = true, .err = ErrType::None};
+};
+
 Result<bool> StorageManager::WritePage(PageID pid, const Byte *buffer) {
+
+  if (pid == STORAGE_MANAGER_META_PAGE_ID) {
+    return { .value = false, .err = ErrType::OperationNotAllowed };
+  };
+
   Offset off = pid * PAGE_SIZE;
 
   ssize_t byte_count = pwrite(fd_database, buffer, PAGE_SIZE, off);
@@ -112,10 +173,11 @@ StorageManager::~StorageManager() {
   }
 };
 
-void StorageManager::SetNewPageOffsetIndex(uint64_t new_offset) {
-  Byte buffer[PAGE_SIZE];
-  memcpy(buffer, &new_offset, sizeof(new_page_offset_index));
-  pwrite(fd_database, buffer, PAGE_SIZE, 0);
+void StorageManager::SetNewPageOffsetIndex(uint64_t new_off) {
+  Byte page[PAGE_SIZE];
+  StorageManager::PrivateReadPage(STORAGE_MANAGER_META_PAGE_ID, page);
+  memcpy(page + MAGIC_NUMBER_SIZE, &new_off, sizeof(uint64_t));
+  StorageManager::PrivateWritePage(STORAGE_MANAGER_META_PAGE_ID, page);
   return;
 };
 

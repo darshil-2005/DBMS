@@ -369,7 +369,7 @@ PayloadStream::PayloadStream(BufferPool *bf, PageID leaf_pid, Offset tuple_offse
   this->overflow_page_id = overflow_page_id;
 };
 
-Offset PayloadStream::ReadPage(Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset) {
+Offset PayloadStream::ReadPage(const Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset) {
 
   size_t possible_reads = max_offset - start_offset + 1;
   if (n <= possible_reads) {
@@ -428,7 +428,7 @@ size_t PayloadStream::NextBytes(Byte* buffer, size_t n) {
 };
 
 // Takes in a buffer [data] of size buffer_size and writes it in the leaf page.
-WriteStatus LeafPage::WriteChunkLeaf(Byte* page, Byte *buffer, BufferSize buffer_size, Key key, TupleHeader* default_tuple) {
+WriteStatus LeafPage::WriteChunkLeaf(Byte* page, const Byte *buffer, BufferSize buffer_size, Key key, TupleHeader* default_tuple) {
 
   // We know the minimum space is available because otherwise node would have split.
   uint32_t data_size = std::min((uint32_t)(SLOT_SIZE + TUPLE_HEADER_SIZE + buffer_size), (uint32_t)MAX_LEAF_PAGE_DATA);
@@ -533,7 +533,7 @@ WriteStatus LeafPage::WriteChunkLeaf(Byte* page, Byte *buffer, BufferSize buffer
   };
 };
 
-WriteStatus LeafPage::WriteChunkOverflow(Byte* page, Byte *buffer, BufferSize buffer_size) {
+WriteStatus LeafPage::WriteChunkOverflow(Byte* page, const Byte *buffer, BufferSize buffer_size) {
   if (buffer_size + OVERFLOW_PAGE_HEADER_SIZE > PAGE_SIZE) {
     uint16_t written_size = PAGE_SIZE - OVERFLOW_PAGE_HEADER_SIZE;
     memcpy(page + OVERFLOW_PAGE_HEADER_SIZE, buffer, written_size);

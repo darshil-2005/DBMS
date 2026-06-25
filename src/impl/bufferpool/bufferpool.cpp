@@ -36,18 +36,14 @@ BufferPool::~BufferPool() {
   };
 };
 
-int BufferPool::DumpCurrBufferPool(bool p) {
+int BufferPool::GetTotalPinnedPages() {
 
   int cnt = 0;
   for (int i=0; i<POOL_SIZE; i++) {
     if (buffer_pool_meta[i].pin_count > 0) {
-      if (p) std::cout << buffer_pool_meta[i].page_id << ", ";
-      // std::cout << "Pin Count: " << buffer_pool_meta[i].pin_count << std::endl;
-      // std::cout << "Reference Bit: " << static_cast<int>(buffer_pool_meta[i].reference_bit) << std::endl;
       cnt++;
     };
   };
-  if (p) std::cout << std::endl << cnt << std::endl;
   return cnt;
 };
 
@@ -151,13 +147,6 @@ Result<Byte *> BufferPool::RequestPage(PageID pid) {
   Result<bool> storage_read_status =
       storage_manager->ReadPage(pid, buffer_pool + offset);
 
-  /*
-  Byte bbb[PAGE_SIZE];
-
-  Result<bool> sr =
-      storage_manager->ReadPage(pid, bbb);
-  */
-  
   // Maybe we can handle this hear rather than passing it upwards
   if (storage_read_status.value == false) {
     return {.value = nullptr, .err = ErrType::SystemErr };
@@ -173,7 +162,6 @@ Result<Byte *> BufferPool::RequestPage(PageID pid) {
   return {.value = buffer_pool + offset, .err = ErrType::None};
 };
 
-// BUG: Bug here the entries in the unpinned pages can become stale
 Result<bool> BufferPool::ReleasePage(PageID pid, bool is_dirty) {
   if (!page_table.count(pid)) {
     return {.value = false, .err = ErrType::PageNotFoundInBufferPool};
@@ -202,5 +190,3 @@ Result<NewPage> BufferPool::AllocateNewPage(){
   NewPage response = { .ptr = ptr_to_page.value, .pid = result.value };
   return { .value = response, .err = ErrType::None };
 };
-
-

@@ -25,11 +25,10 @@ class BufferPool {
   Result<Byte*> RequestPage(PageID pid);
   Result<bool> ReleasePage(PageID pid, bool is_dirty);
   Result<NewPage> AllocateNewPage();
-  int DumpCurrBufferPool(bool p = true);
-
-  Byte* buffer_pool;
+  int GetTotalPinnedPages();
 
   private:
+  Byte* buffer_pool;
   StorageManager* storage_manager;
   std::unordered_map<PageID, OffsetIndex> page_table;
   std::vector<OffsetIndex> free_frames;

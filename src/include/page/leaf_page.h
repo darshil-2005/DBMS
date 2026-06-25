@@ -68,20 +68,12 @@ struct __attribute__((__packed__)) OverflowPageHeader {
 };
 
 struct __attribute__((__packed__)) LeafPageHeader {
-  // page type
   PageType page_type;
-  // page id
   PageID page_id;
-  // free space end
-  // num of bytes from the start of the page to the last free byte.
   PageOffset free_space_end_offset;
-  // slot array size
   uint16_t slot_array_size;
-  // garbage bytes
   uint16_t garbage_bytes;
-  // sibling prev pageid
   PageID left_pid;
-  // sibling next pageid
   PageID right_pid;
 };
 
@@ -95,29 +87,25 @@ struct SearchResult {
 };
 
 class PayloadStream {
-
-  public:
-    BufferPool* buffer_pool;
+  private:
     PageID curr_pid;
     Offset curr_page_offset;
     Offset curr_page_end;
-
     size_t total_bytes;
     size_t bytes_read;
-
     bool overflow;
     PageID overflow_page_id;
+    BufferPool* buffer_pool;
+    Offset ReadPage(const Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset);
 
+  public:
     PayloadStream();
     PayloadStream(BufferPool *bf, PageID leaf_pid, Offset tuple_offset, Offset tuple_end_offset, size_t total_tuple_size, bool overflow, PageID overflow_page_id);
     size_t NextBytes(Byte* buffer, size_t n);
-    Offset ReadPage(Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset);
+    bool IsEOF() const { return bytes_read >= total_bytes; }
 };
 
 namespace LeafPage {
-  // SlotArrayElement* slot_array;
-  // data : slot array | free space | tuples
-
   Key HandleSplit(Byte* page, Byte* new_page, PageID pid);
   bool MakePage(Byte* page, SlotArrayElement* slot_array_start, uint16_t slot_array_size, Byte* buffer, PageID pid, PageID left_pid, PageID right_pid);
   SearchResult Search(Byte* page, Key key);
@@ -126,24 +114,19 @@ namespace LeafPage {
   Key GetKeyFromSlotElement(Byte* page, SlotArrayElement* element); 
   Offset ReadPage(Byte* page, Byte* buffer, size_t n, Offset start_offset, Offset max_offset);
   uint32_t GetTupleSizeFromSlotElement(Byte* page, SlotArrayElement* element);
-  
-  WriteStatus WriteChunkLeaf(Byte* page, Byte* buffer, BufferSize buffer_size, Key key, TupleHeader* default_tuple = nullptr);
-  WriteStatus WriteChunkOverflow(Byte* page, Byte* buffer, BufferSize buffer_size);
-
+  WriteStatus WriteChunkLeaf(Byte* page, const Byte* buffer, BufferSize buffer_size, Key key, TupleHeader* default_tuple = nullptr);
+  WriteStatus WriteChunkOverflow(Byte* page, const Byte* buffer, BufferSize buffer_size);
   uint16_t GetCurrentUsedSpace(Byte* page);
   BorrowQuery CanLendFromRight(Byte* page, uint16_t needed);
   BorrowQuery CanLendFromLeft(Byte* page, uint16_t needed);
   Key HandleLeftBorrow(Byte* borrower_page, Byte* lender_page, BorrowQuery borrow_report);
   Key HandleRightBorrow(Byte* borrower_page, Byte* lender_page, BorrowQuery borrow_report);
-
   uint16_t CheckAvailableSpace(Byte* page);
   uint16_t CheckGarbageBytes(Byte* page);
   bool DeleteTuple(Byte* page, Key key);
-
   void MergePages(Byte* to_page, Byte* from_page);
   void DefragmentPage(Byte* page);
   Key GetPageFirstKey(Byte* page);
-
   void DumpPage(Byte* page);
   void DumpPageFirstLast(Byte *page);
 };
