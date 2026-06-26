@@ -14,10 +14,6 @@ BTree::BTree(BufferPool &bf) {
   uint32_t retrieved_magic_number;
   memcpy(&retrieved_magic_number, dataset_meta_page, MAGIC_NUMBER_SIZE);
 
-  std::cout << "retrieved_magic_number: " << retrieved_magic_number << std::endl;
-  std::cout << "original_magic_number: " << DATABASE_MAGIC_NUMBER << std::endl;
-  std::cout << "original_magic_number2: " << MAGIC_NUMBER << std::endl;
-
   if (retrieved_magic_number == DATABASE_MAGIC_NUMBER) {
    memcpy(&root_page_id, dataset_meta_page + MAGIC_NUMBER_SIZE, sizeof(PageID)); 
    std::cout << "[Btree] Loaded tree at Root PID: " << root_page_id << "\n";
@@ -241,24 +237,9 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
   if (page_header->page_type == PageType::InternalPage) {
 
     PageID child_pid = InternalPage::GetChildPageID(page, key);
-
-    /*
-     * Because the database is single threaded we can release this page for now since no one else will change it.
-     * But we wont for this implementation since no one else will access the bufferpool accept this thread and the height of the btree is at max 5.
-     * */
-
     DeleteStatus report = BTree::Delete(child_pid, key);
 
-    // Now we need to check if the child is underflown, if he is we have to decide whether to borrow or merge or let the child stay in underflow state.
-
-    // Get left sibling of the current child
-    // See if we can borrow from it.
-    // if yes then do the borrowing and change this nodes key_boundary for both children.
-    // if no then go all this for the right sibling.
-    // if that does not succeed then we must merge.
-    // merge:
-    // merge with the left child.
-    // if no left child then merge with the right child
+    if (report.page_type == PageType::InvalidPage) return report;
 
     if (report.page_type == PageType::LeafPage) {
       if (report.underflown) {
@@ -487,6 +468,7 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
           // Copy all data from the second arg page to the first arg page because that is easier.
           InternalPage::MergePages(partition_key, to_page, from_page);
 
+          /*
           InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(page);
           if (page_header->page_id == root_page_id && page_header->num_keys == 0) {
             // The surviving page is left_pid_check.value
@@ -497,6 +479,7 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
             buffer_pool->ReleasePage(left_pid_check.value, true);
             return { .underflown = false, .page_type = PageType::InvalidPage, .current_size = 0, .success = report.success };
           };
+          */
           // TODO: Now we have to make a signal from here to inform that absorbee page is completely freed.
 
           uint16_t usedspace;
@@ -523,6 +506,7 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
           
           InternalPage::MergePages(partition_key, to_page, from_page);
 
+          /*
           InternalPageHeader* page_header = reinterpret_cast<InternalPageHeader*>(page);
           if (page_header->page_id == root_page_id && page_header->num_keys == 0) {
             // The surviving page is child_pid
@@ -533,6 +517,7 @@ DeleteStatus BTree::Delete(PageID pid, Key key) {
             buffer_pool->ReleasePage(child_pid, true);
             return { .underflown = false, .page_type = PageType::InvalidPage, .current_size = 0, .success = report.success };
           };
+          */
           
           uint16_t usedspace;
           bool underflow_happened = InternalPage::CheckUnderflow(page, usedspace);

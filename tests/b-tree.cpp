@@ -262,7 +262,6 @@ TEST_CASE("Delete from left works", "[b-tree][delete][defrag][borrow][merge][del
   int nd = 30000;
 
   for (int i=0; i < nd; i++) {
-    std::cout << "Key: " << dataset.keys[i] << std::endl;
     REQUIRE(bt.Delete(dataset.keys[i]) == true);
   };
 
@@ -306,9 +305,6 @@ TEST_CASE("BTree maintains persistence after left deletions.", "[b-tree][read-de
     PayloadStream stream = bt.Search(dataset.keys[i]);
 
     if (i < nd) {
-      if (!stream.IsEOF()) {
-        std::cout << "Index: " << dataset.keys[i] << ", " << i << std::endl;
-      }
       REQUIRE(stream.IsEOF());
       continue;
     };
@@ -349,7 +345,7 @@ TEST_CASE("Delete from right works", "[b-tree][delete][defrag][borrow][merge][de
   int nd = 30000;
 
   for (int i=num_records-1; i >= num_records - nd; i--) {
-    bt.Delete(dataset.keys[i]);
+    REQUIRE(bt.Delete(dataset.keys[i]) == true);
   };
 
   Byte result[100000];
@@ -431,12 +427,11 @@ TEST_CASE("Delete works for random deletes.", "[b-tree][delete][defrag][borrow][
   int nd = 30000;
 
   for (int i=num_records-1; i >= num_records - nd; i--) {
-    bt.Delete(dataset.keys[i]);
+    REQUIRE(bt.Delete(dataset.keys[i]) == true);
   };
 
   for (int i=0; i<num_records; i++) {
     size_t n = dataset.payloads[i].size() + sizeof(Key);
-
     PayloadStream stream = bt.Search(dataset.keys[i]);
 
     if (i >= num_records - nd) {
