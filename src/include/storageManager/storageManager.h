@@ -9,11 +9,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-namespace fs = std::filesystem;
-
-constexpr const char* DATA_DIR = "./data";
-constexpr const char* DB_PATH  = "./data/engine.db";
-constexpr const char* LOG_PATH = "./data/engine.log";
 
 class StorageManager {
 
@@ -33,7 +28,7 @@ class StorageManager {
     bool IsDatabaseFile(int file_descriptor);
 
   public:
-    bool Bootstrap();
+    bool Bootstrap(std::string DB_PATH);
     ~StorageManager();
     Result<bool> ReadPage(PageID pid, Byte* buffer);
     Result<bool> WritePage(PageID pid, const Byte* buffer);

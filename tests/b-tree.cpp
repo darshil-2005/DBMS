@@ -6,7 +6,8 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include <iostream>
+
+namespace fs = std::filesystem;
 
 struct TestDataset {
   std::vector<Key> keys;
@@ -54,13 +55,14 @@ TEST_CASE("Insert function properly inserts small and large tuples with strict i
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
   
   REQUIRE(dataset.keys.size() == 60000);
+  std::string DATA_DIR = "./data/mydb.db";
   
   if (fs::exists(DATA_DIR)) {
     fs::remove_all(DATA_DIR);
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
 
@@ -94,9 +96,10 @@ TEST_CASE("BTree maintains persistence normal.", "[b-tree][read-normal]") {
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
   
   REQUIRE(dataset.keys.size() == 60000);
+  std::string DATA_DIR = "./data/mydb.db";
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
   int num_records = 60000;
@@ -121,6 +124,7 @@ TEST_CASE("Insert function properly inserts small and large tuples with no parti
 
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
   
+  std::string DATA_DIR = "./data/mydb.db";
   REQUIRE(dataset.keys.size() == 60000);
   
   if (fs::exists(DATA_DIR)) {
@@ -128,7 +132,7 @@ TEST_CASE("Insert function properly inserts small and large tuples with no parti
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
   Byte buffer[100000];
@@ -159,8 +163,9 @@ TEST_CASE("BTree maintains persistence jumbled.", "[b-tree][read-jumbled]") {
   
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
   int num_records = 60000;
@@ -187,12 +192,13 @@ TEST_CASE("Defragmentation works", "[b-tree][defrag][defrag-pure]") {
   
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   if (fs::exists(DATA_DIR)) {
     fs::remove_all(DATA_DIR);
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
 
@@ -241,12 +247,13 @@ TEST_CASE("Delete from left works", "[b-tree][delete][defrag][borrow][merge][del
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   if (fs::exists(DATA_DIR)) {
     fs::remove_all(DATA_DIR);
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
 
@@ -289,8 +296,9 @@ TEST_CASE("BTree maintains persistence after left deletions.", "[b-tree][read-de
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   
   BTree bt(bf); 
@@ -324,12 +332,13 @@ TEST_CASE("Delete from right works", "[b-tree][delete][defrag][borrow][merge][de
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   if (fs::exists(DATA_DIR)) {
     fs::remove_all(DATA_DIR);
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
 
@@ -372,8 +381,9 @@ TEST_CASE("BTree maintains persistence after right deletions.", "[b-tree][read-d
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
 
   BTree bt(bf); 
@@ -405,12 +415,13 @@ TEST_CASE("Delete works for random deletes.", "[b-tree][delete][defrag][borrow][
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   if (fs::exists(DATA_DIR)) {
     fs::remove_all(DATA_DIR);
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
 
@@ -453,7 +464,8 @@ TEST_CASE("BTree maintains persistence after random deletions.", "[b-tree][read-
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  std::string DATA_DIR = "./data/mydb.db";
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   
   // Replace 1336 with the actual root_page_id printed by the random delete write test
@@ -488,12 +500,13 @@ TEST_CASE("B-Tree survives alternating insert and delete waves.", "[b-tree][chur
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   if (fs::exists(DATA_DIR)) {
     fs::remove_all(DATA_DIR);
   };
   
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
   BTree bt(bf);
 
@@ -547,8 +560,9 @@ TEST_CASE("BTree maintains persistence after alternating insert and delete waves
   TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
+  std::string DATA_DIR = "./data/mydb.db";
   StorageManager sm;
-  REQUIRE(sm.Bootstrap() == true);
+  REQUIRE(sm.Bootstrap(DATA_DIR) == true);
   BufferPool bf(sm);
 
   BTree bt(bf); 

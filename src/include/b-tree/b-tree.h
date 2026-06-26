@@ -47,6 +47,7 @@ class BTree {
 
   public:
   BTree(BufferPool& bf);
+  ~BTree() = default;
   bool Insert(const Byte* buffer, BufferSize buffer_size, Key key);
   PageID GetRootPageID() const;
   PayloadStream Search(Key key);

@@ -1,24 +1,29 @@
 #include "../../include/storageManager/storageManager.h"
 
-// Page ID: 0 will now be meta data pages.
+namespace fs = std::filesystem;
 
-bool StorageManager::Bootstrap() {
+bool StorageManager::Bootstrap(std::string DB_PATH) {
+
+  std::cout << "[Storage Manager] Bootstraping..." << std::endl;
+
+  fs::path file_path(DB_PATH);
+  fs::path DATA_DIR = file_path.parent_path();
 
   if (!fs::exists(DATA_DIR)) {
     fs::create_directories(DATA_DIR);
-    std::cout << "[INIT] Initialized data directory: " << DATA_DIR << std::endl;
+    std::cout << "[Storage Manager] Initialized data directory: " << DATA_DIR << std::endl;
   };
 
-  if (!fs::exists(DB_PATH)) {
-    fd_database = open(DB_PATH, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+  if (!DATA_DIR.empty() && !fs::exists(DB_PATH)) {
+    fd_database = open(DB_PATH.c_str(), O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
   } else {
-    fd_database = open(DB_PATH, O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
+    fd_database = open(DB_PATH.c_str(), O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
   };
   
   if (!StorageManager::IsDatabaseFile(fd_database)) {
     Byte buffer[PAGE_SIZE];
     memset(buffer, 0, PAGE_SIZE);
-    uint32_t magic_to_write = MAGIC_NUMBER;
+    uint32_t magic_to_write = STORAGE_MANAGER_MAGIC_NUMBER;
     memcpy(buffer, &magic_to_write, MAGIC_NUMBER_SIZE);
     uint64_t off_start = DATABASE_META_PAGE_ID + 1;
     memcpy(buffer + MAGIC_NUMBER_SIZE, &off_start, sizeof(uint64_t));
@@ -32,22 +37,13 @@ bool StorageManager::Bootstrap() {
   StorageManager::PrivateReadPage(STORAGE_MANAGER_META_PAGE_ID, storage_manager_meta_page);
   memcpy(&new_page_offset_index, storage_manager_meta_page + MAGIC_NUMBER_SIZE, sizeof(uint64_t));
 
-  fd_logs = open(LOG_PATH, O_WRONLY | O_CREAT | O_APPEND | O_DIRECT, S_IRUSR | S_IWUSR);
-
-  if (fd_database == -1 || fd_logs == -1) {
-    if (fd_database != -1) {
-      close(fd_database);
-      fd_database = -1;
-    }
-    if (fd_logs != -1) {
-      close(fd_logs);
-      fd_logs = -1;
-    }
+  if (fd_database == -1) {
     return false;
   };
 
   return true;
 };
+
 
 bool StorageManager::IsDatabaseFile(int file_descriptor) {
 
@@ -62,7 +58,7 @@ bool StorageManager::IsDatabaseFile(int file_descriptor) {
   // handle errors
   uint32_t retrieved_magic_number;
   memcpy(&retrieved_magic_number, page, MAGIC_NUMBER_SIZE);
-  if (retrieved_magic_number == MAGIC_NUMBER) {
+  if (retrieved_magic_number == STORAGE_MANAGER_MAGIC_NUMBER) {
     return true;
   };
   return false;
@@ -147,8 +143,7 @@ Result<bool> StorageManager::WritePage(PageID pid, const Byte *buffer) {
 };
 
 StorageManager::~StorageManager() {
-  std::cout << "[Shutdown] Destructor triggered. Releasing system resources..."
-            << std::endl;
+  std::cout << "[Shutdown] Destructor triggered. Releasing system resources..." << std::endl;
 
   if (fd_database != -1) {
     if (close(fd_database) == 0) {
@@ -157,20 +152,9 @@ StorageManager::~StorageManager() {
     } else {
       std::cerr << "[Shutdown] Warning: Failed to close fd_database cleanly."
                 << std::endl;
-    }
+    };
     fd_database = -1;
-  }
-
-  if (fd_logs != -1) {
-    if (close(fd_logs) == 0) {
-      std::cout << "[Shutdown] fd_logs (FD: " << fd_logs
-                << ") closed successfully." << std::endl;
-    } else {
-      std::cerr << "[Shutdown] Warning: Failed to close fd_logs cleanly."
-                << std::endl;
-    }
-    fd_logs = -1;
-  }
+  };
 };
 
 void StorageManager::SetNewPageOffsetIndex(uint64_t new_off) {

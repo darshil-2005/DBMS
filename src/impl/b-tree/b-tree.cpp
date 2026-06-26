@@ -1,4 +1,5 @@
 #include "../../include/b-tree/b-tree.h"
+#include <stdexcept>
 
 // b-tree only talks to buffer pool so buffer pool need to allocate fresh page
 // and also need to deal with freshly freed page.
@@ -9,6 +10,11 @@ BTree::BTree(BufferPool &bf) {
 
   Result<Byte*> dataset_meta_page_request = buffer_pool->RequestPage(DATABASE_META_PAGE_ID);
   // handle errors
+  
+  if (dataset_meta_page_request.err != ErrType::None) {
+    throw std::runtime_error("[BTree] Failed to retreive database meta page.");
+  };
+
   Byte* dataset_meta_page = dataset_meta_page_request.value; 
 
   uint32_t retrieved_magic_number;

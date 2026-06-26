@@ -1,15 +1,13 @@
 #include "../../include/bufferpool/bufferpool.h"
+#include <stdexcept>
 
 BufferPool::BufferPool(StorageManager &sm_input) {
   this->storage_manager = &sm_input;
 
-  int aligned =
-      posix_memalign((void **)&buffer_pool, PAGE_SIZE, POOL_SIZE * PAGE_SIZE);
+  int aligned = posix_memalign((void **)&buffer_pool, PAGE_SIZE, POOL_SIZE * PAGE_SIZE);
 
   if (aligned == ENOMEM) {
-    std::cout << "[FATAL ERROR] Cannot allocate aligned memory to buffer pool."
-              << std::endl;
-    std::exit(1);
+    throw::std::runtime_error("[FATAL ERROR] Not enough memory to initialize the bufferpool");
   };
 
   for (int i = 0; i < POOL_SIZE; i++) {

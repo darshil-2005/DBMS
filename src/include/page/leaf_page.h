@@ -103,6 +103,7 @@ class PayloadStream {
     PayloadStream(BufferPool *bf, PageID leaf_pid, Offset tuple_offset, Offset tuple_end_offset, size_t total_tuple_size, bool overflow, PageID overflow_page_id);
     size_t NextBytes(Byte* buffer, size_t n);
     bool IsEOF() const { return bytes_read >= total_bytes; }
+    size_t PayloadRemaining();
 };
 
 namespace LeafPage {

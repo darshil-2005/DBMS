@@ -61,6 +61,21 @@ struct BorrowQuery {
   uint16_t borrow_amount;
 };
 
+struct __attribute__((__packed__)) RequestHeader {
+  uint32_t magic_number;
+  uint32_t total_length;
+  uint8_t command;
+  uint32_t header_checksum;
+};
+
+struct __attribute__((__packed__)) ResponseHeader {
+  uint32_t magic_number;
+  uint32_t total_length;
+  uint8_t status_code;
+  uint8_t echo_command;
+  uint32_t header_checksum;
+};
+
 enum ErrType {
 
   None,

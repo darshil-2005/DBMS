@@ -1,4 +1,5 @@
 #include "../../include/page/leaf_page.h"
+#include <cstddef>
 
 // need to handle both leaf and overflow page
 uint16_t LeafPage::CheckAvailableSpace(Byte* page) {
@@ -379,6 +380,10 @@ Offset PayloadStream::ReadPage(const Byte* page, Byte* buffer, size_t n, Offset 
     memcpy(buffer, page + start_offset, possible_reads);
     return start_offset + possible_reads;
   };
+};
+
+size_t PayloadStream::PayloadRemaining() {
+  return (total_bytes - bytes_read >= 0) ? (total_bytes - bytes_read) : 0;
 };
 
 size_t PayloadStream::NextBytes(Byte* buffer, size_t n) {
