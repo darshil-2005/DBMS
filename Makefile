@@ -1,4 +1,3 @@
-
 BUILD_DIR = build
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall
@@ -21,6 +20,13 @@ CLIENT_SRCS = client/src/main.cpp \
 
 CLIENT_OBJS = $(patsubst %.cpp, $(BUILD_DIR)/%.o, $(CLIENT_SRCS))
 
+TEST_BIN = database/tests/run_tests.sh
+
+TEST_SRCS = database/tests/b-tree.cpp database/tests/utils/tests_main.cpp
+
+TEST_OBJS = $(patsubst %.cpp, $(BUILD_DIR)/%.o, $(TEST_SRCS)) \
+						$(filter-out build/database/src/main.o build/database/src/impl/server/server.o, $(SERVER_OBJS))
+
 all: $(SERVER_BIN) $(CLIENT_BIN)
 
 $(SERVER_BIN) : $(SERVER_OBJS)
@@ -29,6 +35,14 @@ $(SERVER_BIN) : $(SERVER_OBJS)
 
 $(CLIENT_BIN) : $(CLIENT_OBJS)
 	@echo "Linking Client..."
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+test: $(TEST_BIN)
+	@echo "Running tests..."
+	@cd database/tests && ./run_tests.sh
+
+$(TEST_BIN): $(TEST_OBJS)
+	@echo "Linking Tests..."
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BUILD_DIR)/%.o: %.cpp

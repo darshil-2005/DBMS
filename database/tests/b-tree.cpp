@@ -42,7 +42,7 @@ TestDataset LoadBulkTestData(const std::string& filepath) {
 void PrepareBuffer(Byte *buffer, std::vector<Key> &keys,
                    std::vector<std::string> &str_vec) {
   size_t off = 0;
-  for (int i = 0; i < str_vec.size(); i++) {
+  for (size_t i = 0; i < str_vec.size(); i++) {
     memcpy(buffer + off, &keys[i], sizeof(Key));
     off += sizeof(Key);
     memcpy(buffer + off, str_vec[i].data(), str_vec[i].size());
@@ -52,7 +52,7 @@ void PrepareBuffer(Byte *buffer, std::vector<Key> &keys,
 
 TEST_CASE("Insert function properly inserts small and large tuples with strict increasing by 1 order of keys in the BTree.", "[b-tree][write-normal]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load.csv");
   
   REQUIRE(dataset.keys.size() == 60000);
   std::string DATA_DIR = "./data/mydb.db";
@@ -93,7 +93,7 @@ TEST_CASE("Insert function properly inserts small and large tuples with strict i
 
 TEST_CASE("BTree maintains persistence normal.", "[b-tree][read-normal]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load.csv");
   
   REQUIRE(dataset.keys.size() == 60000);
   std::string DATA_DIR = "./data/mydb.db";
@@ -122,7 +122,7 @@ TEST_CASE("BTree maintains persistence normal.", "[b-tree][read-normal]") {
 
 TEST_CASE("Insert function properly inserts small and large tuples with no particular order of keys in the BTree.", "[b-tree][write-jumbled]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_jumbled.csv");
   
   std::string DATA_DIR = "./data/mydb.db";
   REQUIRE(dataset.keys.size() == 60000);
@@ -159,7 +159,7 @@ TEST_CASE("Insert function properly inserts small and large tuples with no parti
 
 TEST_CASE("BTree maintains persistence jumbled.", "[b-tree][read-jumbled]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_jumbled.csv");
   
   REQUIRE(dataset.keys.size() == 60000);
   
@@ -188,7 +188,7 @@ TEST_CASE("BTree maintains persistence jumbled.", "[b-tree][read-jumbled]") {
 
 TEST_CASE("Defragmentation works", "[b-tree][defrag][defrag-pure]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_small.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_small.csv");
   
   REQUIRE(dataset.keys.size() == 60000);
   
@@ -244,7 +244,7 @@ TEST_CASE("Defragmentation works", "[b-tree][defrag][defrag-pure]") {
 
 TEST_CASE("Delete from left works", "[b-tree][delete][defrag][borrow][merge][delete_left]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
@@ -293,7 +293,7 @@ TEST_CASE("Delete from left works", "[b-tree][delete][defrag][borrow][merge][del
 
 TEST_CASE("BTree maintains persistence after left deletions.", "[b-tree][read-delete-left]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
@@ -329,7 +329,7 @@ TEST_CASE("BTree maintains persistence after left deletions.", "[b-tree][read-de
 
 TEST_CASE("Delete from right works", "[b-tree][delete][defrag][borrow][merge][delete_right]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
@@ -378,7 +378,7 @@ TEST_CASE("Delete from right works", "[b-tree][delete][defrag][borrow][merge][de
 
 TEST_CASE("BTree maintains persistence after right deletions.", "[b-tree][read-delete-right]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
@@ -412,7 +412,7 @@ TEST_CASE("BTree maintains persistence after right deletions.", "[b-tree][read-d
 
 TEST_CASE("Delete works for random deletes.", "[b-tree][delete][defrag][borrow][merge][delete_random]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
@@ -461,7 +461,7 @@ TEST_CASE("Delete works for random deletes.", "[b-tree][delete][defrag][borrow][
 
 TEST_CASE("BTree maintains persistence after random deletions.", "[b-tree][read-delete-random]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   StorageManager sm;
   std::string DATA_DIR = "./data/mydb.db";
@@ -497,7 +497,7 @@ TEST_CASE("BTree maintains persistence after random deletions.", "[b-tree][read-
 
 TEST_CASE("B-Tree survives alternating insert and delete waves.", "[b-tree][churn][recycle]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
@@ -557,7 +557,7 @@ TEST_CASE("B-Tree survives alternating insert and delete waves.", "[b-tree][chur
 
 TEST_CASE("BTree maintains persistence after alternating insert and delete waves.", "[b-tree][read-churn-recycle]") {
 
-  TestDataset dataset = LoadBulkTestData("tests/data/btree_test_load_jumbled.csv");
+  TestDataset dataset = LoadBulkTestData("data/btree_test_load_jumbled.csv");
   REQUIRE(dataset.keys.size() == 60000);
   
   std::string DATA_DIR = "./data/mydb.db";
