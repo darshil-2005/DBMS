@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
     std::cout << "[Main] Bootstrap success.\n";
   };
 
-  serv.RunServer(8080);
+  serv.RunServer(portno);
 
   return 0;
 }
