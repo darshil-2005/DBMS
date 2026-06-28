@@ -84,7 +84,9 @@ delete <key>;
 ```
 
 **Example session:**
+<div>
 <img src="static/demonstration.png" width="500">
+</div>
 
 ## Tests
 
@@ -113,6 +115,7 @@ Stress tests include:
 
 - Test data is stored in `database/tests/data/`.
 - Communication between the client and server uses a custom binary protocol with checksum validation.
+<<<<<<< HEAD
 
 ## Future Plans
 
@@ -122,3 +125,5 @@ Stress tests include:
 - External merge sort for disk-resident datasets
 - Disk-based hash index
 - Free-page reclamation and database file compaction
+=======
+>>>>>>> 2a95bb33b09926a4ad1137f0581c574f17f1a88f
