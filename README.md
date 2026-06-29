@@ -2,6 +2,8 @@
 
 A lightweight, disk-based database engine written in modern C++. The project was built to explore the design and implementation of database storage systems from first principles, with a focus on building a persistent index and the infrastructure required to manage data reliably on disk. It includes a custom storage engine, a TCP server, and a simple CLI for interacting with the database.
 
+**For architectural deatils refer to [architectural file](/Architecture.md).** 
+
 
 ## Features
 
@@ -115,7 +117,6 @@ Stress tests include:
 
 - Test data is stored in `database/tests/data/`.
 - Communication between the client and server uses a custom binary protocol with checksum validation.
-<<<<<<< HEAD
 
 ## Future Plans
 
@@ -125,5 +126,4 @@ Stress tests include:
 - External merge sort for disk-resident datasets
 - Disk-based hash index
 - Free-page reclamation and database file compaction
-=======
->>>>>>> 2a95bb33b09926a4ad1137f0581c574f17f1a88f
+---
